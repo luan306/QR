@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng nhập - Kiểm kê</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-500 to-purple-600 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8">
+    <div class="flex flex-col items-center mb-6">
+      <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Logo" class="w-20 h-20 mb-2">
+      <h1 class="text-2xl font-bold text-indigo-600">Hệ thống kiểm kê</h1>
+    </div>
+
+    <form id="loginForm" class="space-y-4">
+      <input type="text" id="username" placeholder="Tên đăng nhập"
+             class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-400">
+      <input type="password" id="password" placeholder="Mật khẩu"
+             class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-400">
+      <button type="submit" 
+              class="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
+        Đăng nhập
+      </button>
+    </form>
+  </div>
+
+  <script>
+    // User list demo (admin + users do admin tạo)
+    let users = JSON.parse(localStorage.getItem("users") || "[]");
+
+    document.getElementById("loginForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const user = document.getElementById("username").value;
+      const pass = document.getElementById("password").value;
+
+      if(user === "admin" && pass === "admin"){
+        localStorage.setItem("loggedInUser", user);
+        localStorage.setItem("loggedDepartment", "ALL");
+        window.location.href = "admin.html";
+      } else {
+        let found = users.find(u => u.user === user && u.pass === pass);
+        if(found){
+          localStorage.setItem("loggedInUser", found.user);
+          localStorage.setItem("loggedDepartment", found.dep);
+          window.location.href = "app.html";
+        } else {
+          alert("❌ Sai tên đăng nhập hoặc mật khẩu!");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
