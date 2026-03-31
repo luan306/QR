@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+        <h2 class="text-2xl font-bold text-center text-indigo-600 mb-6">🔐 Đăng nhập</h2>
+        
+        <div id="loading" class="hidden">
+            <div class="text-center text-gray-500">Đang đăng nhập...</div>
+        </div>
+
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Tên đăng nhập:</label>
+                <input name="username" id="username" type="text" required
+                       class="mt-1 block w-full p-3 border rounded-xl shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Mật khẩu:</label>
+                <input name="password" id="password" type="password" required
+                       class="mt-1 block w-full p-3 border rounded-xl shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <button type="submit" id="submitBtn"
+                    class="w-full bg-indigo-600 text-white p-3 rounded-xl shadow hover:bg-indigo-700">
+                Đăng nhập
+            </button>
+        </form>
+
+        <div id="login-msg" class="text-red-500 text-center mt-4"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('loginForm');
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submitBtn');
+        const loginMsg = document.getElementById('login-msg');
+
+        // ✅ Tất cả await đều trong async function
+       form.onsubmit = async (e) => {
+    e.preventDefault();
+    loading.classList.remove('hidden');
+    submitBtn.disabled = true;
+    loginMsg.innerText = '';
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: "include",
+            body: JSON.stringify({
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            window.location.href = data.redirect;
+        } else {
+            loginMsg.innerText = data.message;
+            submitBtn.disabled = false;
+        }
+    } catch(err) {
+        loginMsg.innerText = "Lỗi kết nối server";
+        submitBtn.disabled = false;
+    } finally {
+        loading.classList.add('hidden');
+    }
+};
+        
+    </script>
+</body>
+</html>

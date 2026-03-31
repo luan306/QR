@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Kiểm kê tài sản</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 flex h-screen">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-indigo-700 text-white flex flex-col">
+    <div class="p-4 text-2xl font-bold border-b border-indigo-500">🛠️ Admin Panel</div>
+    <nav class="flex-1 p-4 space-y-2">
+      <button onclick="showTab('dashboard')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">📊 Dashboard</button>
+      <button onclick="showTab('users')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">👤 Quản lý User</button>
+      <button onclick="showTab('devices')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">💻 Quản lý Thiết bị</button>
+      <button onclick="showTab('reports')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">📋 Báo cáo</button>
+    </nav>
+    <div class="p-4 border-t border-indigo-500">
+      <button onclick="logout()" class="w-full py-2 bg-red-500 rounded-lg">🚪 Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 p-6 overflow-y-auto">
+    <!-- Dashboard -->
+    <section id="dashboard" class="tab">
+      <h2 class="text-2xl font-bold mb-6">📊 Thống kê quét thiết bị</h2>
+
+      <!-- Tổng quan -->
+      <div class="bg-white p-6 rounded-xl shadow mb-8 flex justify-center">
+        <div class="w-48 h-48">
+          <canvas id="overallChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Thống kê theo bộ phận -->
+      <div class="bg-white p-6 rounded-xl shadow mb-8">
+        <h3 class="text-lg font-semibold mb-4">Theo bộ phận</h3>
+        <canvas id="deptChart" height="120"></canvas>
+      </div>
+
+      <!-- Chi tiết bộ phận -->
+      <div id="deptDevices" class="bg-white p-6 rounded-xl shadow hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">📋 Chi tiết bộ phận: <span id="deptName"></span></h3>
+          <button onclick="exportDept()" class="px-4 py-2 bg-green-600 text-white rounded">📤 Xuất Excel</button>
+        </div>
+        <table class="w-full border text-sm bg-white rounded-xl shadow">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="p-2 border">QR Code</th>
+              <th class="p-2 border">Tên thiết bị</th>
+              <th class="p-2 border">Vị trí</th>
+              <th class="p-2 border">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody id="deptDeviceTable"></tbody>
+        </table>
+      </div>
+
+      <!-- 📂 Quản lý bộ phận -->
+      <div class="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6 mt-8">
+        <h3 class="text-lg font-bold text-gray-700 mb-4">📂 Danh sách Bộ phận</h3>
+        <div id="departments-list" class="divide-y divide-gray-200">
+          <% departments.forEach(dep => { %>
+            <div class="flex justify-between items-center py-2">
+              <span class="text-gray-800 font-medium"><%= dep.name %></span>
+              <button onclick="deleteDepartment(<%= dep.id %>, this)" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">
+                ❌ Xóa
+              </button>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    </section>
+
+    <!-- Users -->
+    <section id="users" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">👤 Quản lý User</h2>
+      <form id="userForm" class="bg-white p-6 rounded-xl shadow space-y-4 max-w-md">
+        <input type="text" id="newUser" placeholder="Tên đăng nhập" class="w-full p-3 border rounded-lg">
+        <input type="password" id="newPass" placeholder="Mật khẩu" class="w-full p-3 border rounded-lg">
+        <input type="text" id="fullName" placeholder="Họ tên" class="w-full p-3 border rounded-lg">
+        <select id="department" class="w-full p-3 border rounded-lg">
+          <% departments.forEach(dep => { %>
+            <option value="<%= dep.id %>"><%= dep.name %></option>
+          <% }); %>
+        </select>
+        <select id="role" class="w-full p-3 border rounded-lg">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-lg">+ Tạo User</button>
+      </form>
+      <div class="mt-6 bg-white p-4 rounded-xl shadow">
+        <h3 class="font-semibold mb-2">Danh sách User</h3>
+        <table class="w-full border text-sm">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="p-2 border">ID</th>
+              <th class="p-2 border">Tên đăng nhập</th>
+              <th class="p-2 border">Họ tên</th>
+              <th class="p-2 border">Bộ phận</th>
+              <th class="p-2 border">Role</th>
+              <th class="p-2 border">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="userTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Modal Edit User -->
+    <div id="editUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+      <div class="bg-white p-6 rounded-xl w-96">
+        <h3 class="text-xl font-bold mb-4">✏️ Chỉnh sửa User</h3>
+        <input type="hidden" id="editUserId">
+        <input type="text" id="editFullName" placeholder="Họ tên" class="w-full p-3 border rounded-lg mb-3">
+        <input type="password" id="editPass" placeholder="Mật khẩu mới (để trống nếu không đổi)" class="w-full p-3 border rounded-lg mb-3">
+        <select id="editDepartment" class="w-full p-3 border rounded-lg mb-3">
+          <% departments.forEach(dep => { %>
+            <option value="<%= dep.id %>"><%= dep.name %></option>
+          <% }); %>
+        </select>
+        <select id="editRole" class="w-full p-3 border rounded-lg mb-4">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+        <div class="flex justify-end gap-2">
+          <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-400 text-white rounded-lg">Hủy</button>
+          <button onclick="saveUserEdit()" class="px-4 py-2 bg-blue-600 text-white rounded-lg">💾 Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Devices -->
+    <section id="devices" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">💻 Quản lý Thiết bị</h2>
+      <div class="bg-white p-6 rounded-xl shadow space-y-4">
+        <button onclick="window.location.href='<%= apiUrl %>/devices/export'" class="bg-blue-500 text-white px-4 py-2 rounded">⬇️ Tải danh sách thiết bị</button>
+        <button onclick="downloadDeviceTemplate()" class="px-6 py-2 bg-green-600 text-white rounded-lg">📥 Tải Excel mẫu</button>
+        <div class="mt-4 flex gap-2">
+          <input type="file" id="excelFile" accept=".xlsx,.xls" class="border p-2 rounded">
+          <button onclick="uploadExcel()" class="px-6 py-2 bg-purple-600 text-white rounded-lg">📤 Upload Excel</button>
+          <button id="deleteAllDevicesBtn" class="px-6 py-2 bg-red-500 text-white rounded-lg">🗑️ Xóa tất cả thiết bị</button>
+        </div>
+        <table class="w-full mt-4 border text-sm">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="p-2 border">ID</th>
+              <th class="p-2 border">Tên Thiết Bị</th>
+              <th class="p-2 border">Loại thiết bị</th>
+              <th class="p-2 border">Bộ phận</th>
+              <th class="p-2 border">Trạng thái</th>
+              <th class="p-2 border">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="deviceTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Reports -->
+    <section id="reports" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">📋 Báo cáo</h2>
+      <div class="bg-white p-6 rounded-xl shadow">
+        <p class="mb-4">Danh sách thiết bị đã quét:</p>
+        <ul id="scannedList" class="space-y-2 text-green-700 font-medium"></ul>
+        <div class="mt-6 text-center">
+          <button onclick="exportReport()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg">📤 Xuất báo cáo Excel</button>
+          <button onclick="clearReports()" class="px-6 py-3 bg-red-600 text-white rounded-lg">🗑️ Xóa tất cả báo cáo</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API = window.location.origin + "/api";
+    const currentUser = <%- JSON.stringify(user) %>;
+
+    // Kiểm tra quyền admin
+    if (!currentUser.id) {
+      window.location.href = "/login";
+    } else if (currentUser.role !== "admin") {
+      alert("🚫 Bạn không có quyền Admin!");
+      window.location.href = "/index";
+    }
+
+    // 🔹 Show tab
+    function showTab(tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+      if(tabId === "dashboard") loadCharts();
+      if(tabId === "users") fetchUsers();
+      if(tabId === "devices") fetchDevices();
+      if(tabId === "reports") fetchReports();
+    }
+
+    function logout(){ 
+      window.location.href = "/logout"; 
+    }
+
+    // === USERS ===
+    async function fetchUsers(){
+      let res = await fetch(API+"/users");
+      let data = await res.json();
+      let tbody = document.getElementById("userTable");
+      tbody.innerHTML = "";
+      data.forEach(u=>{
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="border p-2">${u.id}</td>
+          <td class="border p-2">${u.username}</td>
+          <td class="border p-2">${u.full_name}</td>
+          <td class="border p-2">${u.department_name || u.department_id}</td>
+          <td class="border p-2">${u.role}</td>
+          <td class="border p-2">
+            <button onclick='openEditModal(${JSON.stringify(u)})' class="px-3 py-1 bg-yellow-500 text-white rounded-lg">✏️ Edit</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById("userForm").addEventListener("submit", async e=>{
+      e.preventDefault();
+      let body = {
+        username: document.getElementById("newUser").value,
+        password: document.getElementById("newPass").value,
+        full_name: document.getElementById("fullName").value,
+        department_id: document.getElementById("department").value,
+        role: document.getElementById("role").value
+      };
+      let res = await fetch(API+"/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      let data = await res.json();
+      alert(data.message);
+      fetchUsers();
+      e.target.reset();
+    });
+
+    function openEditModal(user){
+      document.getElementById("editUserId").value = user.id;
+      document.getElementById("editFullName").value = user.full_name;
+      document.getElementById("editDepartment").value = user.department_id;
+      document.getElementById("editRole").value = user.role;
+      document.getElementById("editPass").value = "";
+      document.getElementById("editUserModal").classList.remove("hidden");
+    }
+
+    function closeEditModal(){ 
+      document.getElementById("editUserModal").classList.add("hidden"); 
+    }
+
+    async function saveUserEdit(){
+      let id = document.getElementById("editUserId").value;
+      let body = {
+        full_name: document.getElementById("editFullName").value,
+        department_id: document.getElementById("editDepartment").value,
+        role: document.getElementById("editRole").value
+      };
+      
+      const password = document.getElementById("editPass").value;
+      if (password) body.password = password;
+
+      let res = await fetch(API+"/users/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      let data = await res.json();
+      alert(data.message);
+      closeEditModal();
+      fetchUsers();
+    }
+
+    // === DEVICES ===
+    async function fetchDevices(){
+      try {
+        let res = await fetch(API + "/devices");
+        let devices = await res.json();
+
+        let tbody = document.getElementById("deviceTable");
+        tbody.innerHTML = "";
+
+        devices.forEach(dev => {
+          let tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="border p-2">${dev.id}</td>
+            <td class="border p-2">${dev.name}</td>
+            <td class="border p-2">${dev.device_type_name || "-"}</td>
+            <td class="border p-2">${dev.department_name || "-"}</td>
+            <td class="border p-2 ${dev.status === 'Đã quét' ? 'text-green-600' : 'text-red-600'}">
+              ${dev.status}
+            </td>
+            <td class="border p-2">
+              <button class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                      onclick="deleteDevice(${dev.id})">Xóa</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error("❌ Lỗi tải thiết bị:", err);
+      }
+    }
+
+    function downloadDeviceTemplate(){
+      let ws_data = [["Name","QR_Code","Department","DeviceType","Location"]];
+      ws_data.push(["Laptop Dell","QR001","Phòng IT","Laptop","Tầng 1"]);
+      ws_data.push(["Máy in HP","QR002","Phòng Hành Chính","Máy in","Tầng 2"]);
+      let ws = XLSX.utils.aoa_to_sheet(ws_data);
+      let wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,"Devices");
+      XLSX.writeFile(wb,"Device_Template.xlsx");
+    }
+
+    async function uploadExcel(){
+      let fileInput=document.getElementById("excelFile");
+      if(!fileInput.files.length){ alert("⚠️ Vui lòng chọn file Excel trước!"); return; }
+      let formData=new FormData();
+      formData.append("file",fileInput.files[0]);
+      let res=await fetch(API+"/devices/upload",{method:"POST",body:formData});
+      let data=await res.json();
+      alert(data.message);
+      fetchDevices();
+    }
+
+    async function deleteDevice(id) {
+      if (!confirm('Bạn có chắc muốn xóa thiết bị này?')) return;
+      const res = await fetch(`${API}/devices/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      alert(data.message);
+      fetchDevices();
+    }
+
+    document.getElementById('deleteAllDevicesBtn').addEventListener('click', async () => {
+      if (!confirm('Bạn có chắc muốn xóa tất cả thiết bị?')) return;
+      const res = await fetch(`${API}/devices`, { method: 'DELETE' });
+      const data = await res.json();
+      alert(data.message);
+      fetchDevices();
+    });
+
+    // === DASHBOARD ===
+    let overallChart, deptChart, lastDeptDevices=[], lastDeptName="";
+
+    async function loadCharts(){
+      let stats=await fetch(API+"/stats/departments").then(r=>r.json());
+      let totalDevices=stats.reduce((sum,s)=>sum+s.total_devices,0);
+      let totalScanned=stats.reduce((sum,s)=>sum+s.scanned_devices,0);
+      let totalPending=Math.max(0,totalDevices-totalScanned);
+      
+      let ctx1=document.getElementById("overallChart").getContext("2d");
+      if(overallChart) overallChart.destroy();
+      overallChart=new Chart(ctx1,{
+        type:"doughnut",
+        data:{
+          labels:["Đã quét","Chưa quét"],
+          datasets:[{
+            data:[totalScanned,totalPending],
+            backgroundColor:["#22c55e","#ef4444"]
+          }]
+        },
+        options:{
+          plugins:{legend:{position:"bottom"}}
+        }
+      });
+      
+      let ctx2=document.getElementById("deptChart").getContext("2d");
+      if(deptChart) deptChart.destroy();
+      deptChart=new Chart(ctx2,{
+        type:"bar",
+        data:{
+          labels:stats.map(s=>s.department_name),
+          datasets:[
+            {label:"Đã quét",data:stats.map(s=>s.scanned_devices),backgroundColor:"#22c55e"},
+            {label:"Chưa quét",data:stats.map(s=>s.pending_devices),backgroundColor:"#ef4444"}
+          ]
+        },
+        options:{
+          responsive:true,
+          scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},
+          onClick:async(evt,item)=>{
+            if(item.length>0){
+              let idx=item[0].index;
+              let dept=stats[idx];
+              viewDept(dept.department_id,dept.department_name);
+            }
+          }
+        }
+      });
+    }
+
+    async function viewDept(id,name){
+      let data=await fetch(API+"/departments/"+id+"/devices").then(r=>r.json());
+      lastDeptDevices=data; lastDeptName=name;
+      document.getElementById("deptName").textContent=name;
+      document.getElementById("deptDevices").classList.remove("hidden");
+      let tbody=document.getElementById("deptDeviceTable");
+      tbody.innerHTML="";
+      data.forEach(d=>{
+        let tr=document.createElement("tr");
+        tr.innerHTML=`<td class="border p-2">${d.qr_code}</td><td class="border p-2">${d.name}</td><td class="border p-2">${d.location}</td><td class="border p-2 ${d.status==='Đã quét'?'text-green-600':'text-red-600'}">${d.status||"Chưa quét"}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportDept(){
+      if(lastDeptDevices.length===0){ alert("⚠️ Chưa có dữ liệu để xuất!"); return; }
+      let ws=XLSX.utils.json_to_sheet(lastDeptDevices);
+      let wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,lastDeptName);
+      XLSX.writeFile(wb,`Dept_${lastDeptName}.xlsx`);
+    }
+
+    // === REPORTS ===
+    async function fetchReports(){
+      try {
+        let res = await fetch(API + "/scans");
+        let data = await res.json();
+
+        let scans = Array.isArray(data) ? data : data.scans;
+
+        if (!Array.isArray(scans)) {
+          console.error("API trả về không đúng:", data);
+          alert("❌ Không thể tải báo cáo!");
+          return;
+        }
+
+        let list = document.getElementById("scannedList");
+        list.innerHTML = "";
+
+        scans.forEach(s => {
+          let li = document.createElement("li");
+          li.textContent = `${s.device_name} (${s.qr_code}) - ${s.user_name} @ ${s.scanned_at}`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("❌ Lỗi tải báo cáo:", err);
+      }
+    }
+
+    async function exportReport(){
+      let res = await fetch(API + "/scans");
+      let data = await res.json();
+      let scans = Array.isArray(data) ? data : data.scans;
+
+      if (!Array.isArray(scans) || scans.length === 0) {
+        alert("⚠️ Chưa có thiết bị nào được quét!");
+        return;
+      }
+
+      let ws_data=[["Tên Thiết Bị","QR Code","Người Quét","Thời Gian"]];
+      scans.forEach(s => ws_data.push([s.device_name, s.qr_code, s.user_name, s.scanned_at]));
+
+      let ws=XLSX.utils.aoa_to_sheet(ws_data);
+      let wb=XLSX.utils.book_new(); 
+      XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
+      XLSX.writeFile(wb, "BaoCaoThietBiDaQuet.xlsx");
+    }
+
+    async function clearReports() {
+      if (!confirm("Bạn có chắc muốn xóa toàn bộ báo cáo?")) return;
+
+      try {
+        const res = await fetch(API + "/scans", { method: "DELETE" });
+        const data = await res.json();
+        
+        if (data.success) {
+          alert("✅ " + data.message);
+          fetchReports();
+        } else {
+          alert("❌ Xóa thất bại: " + data.message);
+        }
+      } catch (err) {
+        console.error("❌ Fetch error:", err);
+        alert("Có lỗi khi kết nối server!");
+      }
+    }
+
+    // === DEPARTMENT MANAGEMENT ===
+    async function deleteDepartment(id, btn) {
+      if (!confirm("Bạn có chắc muốn xóa bộ phận này?")) return;
+
+      try {
+        const res = await fetch(`${API}/departments/${id}`, { method: "DELETE" });
+        const data = await res.json();
+
+        if (data.success) {
+          alert("✅ " + data.message);
+          btn.parentElement.remove();
+        } else {
+          alert("❌ " + data.message);
+        }
+      } catch (err) {
+        console.error("❌ Lỗi xóa department:", err);
+        alert("Có lỗi khi xóa bộ phận!");
+      }
+    }
+
+    // === INIT ===
+    showTab("dashboard");
+  </script>
+</body>
+</html>

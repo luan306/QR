@@ -1,0 +1,184 @@
+CREATE DATABASE inventory;
+USE inventory;
+
+-- =========================
+-- 1. BẢNG BỘ PHẬN
+-- =========================
+CREATE TABLE departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL
+);
+
+-- =========================
+-- 2. BẢNG LOẠI THIẾT BỊ
+-- =========================
+CREATE TABLE device_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+-- =========================
+-- 3. BẢNG USER
+-- =========================
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100),
+    role ENUM('admin','user') DEFAULT 'user',
+    department_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (department_id) REFERENCES departments(id)
+);
+
+-- =========================
+-- 4. BẢNG THIẾT BỊ
+-- =========================
+CREATE TABLE devices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    qr_code VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(100),
+    location VARCHAR(100),
+
+    device_type_id INT,
+    original_department_id INT,
+    current_department_id INT,
+
+    status ENUM('active','broken','lost') DEFAULT 'active',
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (device_type_id) REFERENCES device_types(id),
+    FOREIGN KEY (original_department_id) REFERENCES departments(id),
+    FOREIGN KEY (current_department_id) REFERENCES departments(id)
+);
+
+-- =========================
+-- 5. BẢNG LỊCH SỬ QUÉT
+-- =========================
+CREATE TABLE scans (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    device_id INT,
+
+    scan_department_id INT,
+    scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    note VARCHAR(255),
+
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (device_id) REFERENCES devices(id),
+    FOREIGN KEY (scan_department_id) REFERENCES departments(id)
+);
+INSERT INTO users (username, password, full_name, role, department_id)
+VALUES ('admin', 'admin', 'Quản trị viên', 'admin', 1);
+
+
+INSERT INTO departments (name) VALUES
+('IT'),
+('Văn phòng'),
+('Kế toán');
+ALTER TABLE devices ADD department_id INT
+ALTER TABLE devices 
+ADD FOREIGN KEY (department_id) REFERENCES departments(id);
+SELECT * FROM users;
+
+DESCRIBE scans;
+
+
+
+USE inventory;
+
+-- ============================================================
+-- 1. Thêm role 'auditor' vào users
+-- ============================================================
+ALTER TABLE users 
+  MODIFY COLUMN role ENUM('admin', 'auditor', 'user') NOT NULL DEFAULT 'user';
+
+-- ============================================================
+-- 2. devices.department_id
+-- ============================================================
+SET @c = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND COLUMN_NAME='department_id');
+SET @s = IF(@c=0, 'ALTER TABLE devices ADD COLUMN department_id INT', 'SELECT "department_id exists"');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+SET @fk = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND CONSTRAINT_NAME='fk_devices_dept');
+SET @s = IF(@fk=0,
+  'ALTER TABLE devices ADD CONSTRAINT fk_devices_dept FOREIGN KEY (department_id) REFERENCES departments(id)',
+  'SELECT "fk exists"');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+SET SQL_SAFE_UPDATES = 0;
+UPDATE devices SET department_id = original_department_id WHERE department_id IS NULL;
+SET SQL_SAFE_UPDATES = 1;
+
+-- ============================================================
+-- 3. scans.scan_department
+-- ============================================================
+SET @c = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='scans' AND COLUMN_NAME='scan_department');
+SET @s = IF(@c=0, 'ALTER TABLE scans ADD COLUMN scan_department INT', 'SELECT "scan_department exists"');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- ============================================================
+-- 4. scans.session_id
+-- ============================================================
+SET @c = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='scans' AND COLUMN_NAME='session_id');
+SET @s = IF(@c=0, 'ALTER TABLE scans ADD COLUMN session_id INT NULL', 'SELECT "session_id exists"');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+SET SQL_SAFE_UPDATES = 0;
+UPDATE scans SET scan_department = scan_department_id WHERE scan_department IS NULL AND scan_department_id IS NOT NULL;
+SET SQL_SAFE_UPDATES = 1;
+
+-- ============================================================
+-- 5. Tạo bảng audit_sessions
+-- ============================================================
+CREATE TABLE IF NOT EXISTS audit_sessions (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  user_id       INT NOT NULL,
+  department_id INT NOT NULL,
+  started_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  ended_at      DATETIME NULL,
+  FOREIGN KEY (user_id)       REFERENCES users(id),
+  FOREIGN KEY (department_id) REFERENCES departments(id)
+);
+
+-- FK scans.session_id → audit_sessions
+SET @fk = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='scans' AND CONSTRAINT_NAME='fk_scans_session');
+SET @s = IF(@fk=0,
+  'ALTER TABLE scans ADD CONSTRAINT fk_scans_session FOREIGN KEY (session_id) REFERENCES audit_sessions(id)',
+  'SELECT "fk exists"');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- ============================================================
+-- 6. Tài khoản auditor mẫu
+-- ============================================================
+INSERT IGNORE INTO users (username, password, full_name, role, department_id)
+VALUES ('auditor', 'auditor123', 'Kiểm kê viên', 'auditor', NULL);
+
+-- ============================================================
+-- KIỂM TRA
+-- ============================================================
+SELECT '=== USERS ===' AS '';
+SELECT id, username, full_name, role FROM users;
+
+SELECT '=== DEVICES columns ===' AS '';
+SELECT COLUMN_NAME FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' ORDER BY ORDINAL_POSITION;
+
+SELECT '=== SCANS columns ===' AS '';
+SELECT COLUMN_NAME FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='scans' ORDER BY ORDINAL_POSITION;
+
+SELECT '=== AUDIT_SESSIONS ===' AS '';
+DESCRIBE audit_sessions;
+
+
+
+

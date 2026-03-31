@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Ứng dụng Quét QR - User</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow">
+    <div class="flex items-center space-x-3">
+      <img src="https://i.pravatar.cc/50" class="w-10 h-10 rounded-full border-2 border-white" alt="User">
+      <span id="userName" class="font-semibold">User</span>
+    </div>
+    <button onclick="logout()" class="bg-red-500 px-4 py-2 rounded">Thoát</button>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="flex bg-white shadow text-gray-600">
+    <button onclick="showTab('scan')" id="tab-scan" class="flex-1 py-3 text-center border-b-4 border-indigo-600 text-indigo-600 font-semibold">📷 Quét</button>
+    <button onclick="showTab('list')" id="tab-list" class="flex-1 py-3 text-center">📋 Danh sách</button>
+  </nav>
+
+  <!-- Nội dung -->
+  <main class="flex-grow p-4">
+    <!-- Tab Quét -->
+    <section id="scan" class="tab">
+      <div class="flex justify-center items-center mt-6 relative">
+        <div id="reader" style="width:300px;height:300px;" class="rounded-lg shadow-lg"></div>
+
+        <!-- Overlay góc vuông -->
+        <div class="absolute w-[300px] h-[300px] pointer-events-none flex justify-between">
+          <div class="w-full h-full relative">
+            <!-- Góc trên trái -->
+            <div class="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-green-500"></div>
+            <!-- Góc trên phải -->
+            <div class="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-green-500"></div>
+            <!-- Góc dưới trái -->
+            <div class="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-green-500"></div>
+            <!-- Góc dưới phải -->
+            <div class="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-green-500"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab Danh sách -->
+    <section id="list" class="tab hidden">
+      <h2 class="text-xl font-bold mb-4">Danh sách thiết bị đã quét</h2>
+      <ul id="scannedList" class="space-y-2"></ul>
+    </section>
+  </main>
+
+  <script>
+    // Dữ liệu mẫu
+    let loggedUser = JSON.parse(localStorage.getItem("user")) || { name: "Người dùng", department: "IT" };
+    let devices = JSON.parse(localStorage.getItem("devices")) || [
+      { seri: "QR001", model: "Laptop Dell", department: "IT", status: "Chưa quét" },
+      { seri: "QR002", model: "Máy in HP", department: "Kế toán", status: "Chưa quét" },
+      { seri: "QR003", model: "Màn hình LG", department: "IT", status: "Chưa quét" }
+    ];
+
+    document.getElementById("userName").textContent = loggedUser.name;
+
+    // Tabs
+    function showTab(tab){
+      document.querySelectorAll(".tab").forEach(el => el.classList.add("hidden"));
+      document.getElementById(tab).classList.remove("hidden");
+      document.querySelectorAll("nav button").forEach(btn => btn.classList.remove("border-indigo-600","text-indigo-600","font-semibold"));
+      document.getElementById("tab-"+tab).classList.add("border-indigo-600","text-indigo-600","font-semibold");
+      if(tab==="list") renderList();
+    }
+
+    // Render danh sách
+    function renderList(){
+      let list = document.getElementById("scannedList");
+      list.innerHTML = "";
+      devices.filter(d => d.department === loggedUser.department).forEach(d=>{
+        let li = document.createElement("li");
+        li.className = "p-3 rounded shadow flex justify-between items-center " + (d.status==="Đã quét" ? "bg-green-100" : "bg-gray-100");
+        li.textContent = `${d.seri} - ${d.model} (${d.status})`;
+        list.appendChild(li);
+      });
+    }
+
+    // QR Scanner
+    function onScanSuccess(decodedText){
+      let dev = devices.find(d => d.seri === decodedText && d.department === loggedUser.department);
+      if(dev){
+        dev.status = "Đã quét";
+        localStorage.setItem("devices", JSON.stringify(devices));
+        alert("✅ Đã quét: " + dev.seri + " - " + dev.model);
+      } else {
+        alert("❌ Thiết bị không thuộc bộ phận bạn hoặc chưa có trong danh sách!");
+      }
+    }
+
+    let scanner = new Html5QrcodeScanner("reader", { fps:10, qrbox:{width:250, height:250} });
+    scanner.render(onScanSuccess);
+
+    // Logout
+    function logout(){
+      localStorage.removeItem("user");
+      window.location.href = "login.html";
+    }
+  </script>
+</body>
+</html>

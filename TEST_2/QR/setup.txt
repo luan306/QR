@@ -1,0 +1,25 @@
+cài MySQL,
+node.js
+nginx -> c
+npm install -g pm2
+npm  install -g npm@11.6.0
+npm install -g pm2
+c-> app
+pm2 version
+pm2 start c:\App\QR\Server.js --name "QRApp" -i 1
+
+npm install dotenv
+
+
+GRANT ALL PRIVILEGES ON inventory.* TO 'inventory_user'@'%';
+
+SELECT user, host FROM mysql.user WHERE user = 'inventory_user';
+GRANT ALL PRIVILEGES ON inventory.* TO 'inventory_user'@'%';
+FLUSH PRIVILEGES;
+ALTER USER 'inventory_user'@'%' IDENTIFIED BY 'MatKhauCuaBan123!';
+FLUSH PRIVILEGES;
+SHOW GRANTS FOR 'inventory_user'@'%';
+
+
+
+https://slproweb.com/products/Win32OpenSSL.html

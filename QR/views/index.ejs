@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản lý tài sản</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
+<style>
+  #reader { position: relative; width: 300px; height: 300px; margin: auto; border: 2px solid rgba(0,255,0,0.5); border-radius: 12px; overflow: hidden;}
+  .laser { position: absolute; top:0; left:0; width:100%; height:2px; background: lime; animation: scan 2s linear infinite;}
+  @keyframes scan {0%{top:0;}100%{top:100%;}}
+</style>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+
+<script>
+  let currentUser = {};
+  fetch('/api/current-user')
+    .then(res => res.json())
+    .then(data => {
+      currentUser = data.user;
+      if (!currentUser.id) window.location.href = "/login";
+      document.getElementById("welcome-user").innerText = "👋 Xin chào, " + currentUser.full_name;
+    });
+</script>
+
+
+<header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex justify-between items-center shadow-md">
+  <div class="flex items-center space-x-2">
+    <img src="https://cdn-icons-png.flaticon.com/512/1041/1041882.png" class="w-8 h-8">
+    <span class="font-bold text-lg">Asset Manager</span>
+  </div>
+  <div class="flex items-center space-x-2">
+    <span id="welcome-user" class="mr-3">👋 Xin chào, <%= user.full_name %></span>
+    <% if(user.role === "admin"){ %>
+    <button id="admin-btn" onclick="goAdmin()" class="bg-yellow-500 px-3 py-1 rounded-lg shadow hover:bg-yellow-600">Trang Admin</button>
+    <% } %>
+    <button onclick="logout()" class="bg-red-500 px-3 py-1 rounded-lg shadow hover:bg-red-600">Đăng xuất</button>
+  </div>
+</header>
+
+<main class="flex-1 p-4 overflow-y-auto">
+
+<!-- TAB SCANNER -->
+<section id="tab-scan" class="tab text-center">
+  <h2 class="text-xl font-bold mb-4 text-indigo-600">📷 Quét mã QR</h2>
+  <div id="reader"><div class="laser"></div></div>
+  <div id="scan-result" class="mt-4 text-gray-700"></div>
+  <div id="add-new-btn" class="mt-4 hidden">
+    <button onclick="showAddForm()" class="px-6 py-3 bg-green-500 text-white rounded-xl shadow hover:bg-green-600">➕ Thêm thiết bị mới</button>
+  </div>
+  <div class="mt-4 flex justify-center space-x-3">
+    <button onclick="startScanner()" class="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">Bắt đầu</button>
+    <button onclick="stopScanner()" class="px-6 py-3 bg-red-500 text-white rounded-xl shadow hover:bg-red-600">Ngừng</button>
+  </div>
+</section>
+
+<!-- TAB INVENTORY -->
+<section id="tab-inventory" class="tab hidden">
+  <h2 class="text-xl font-bold mb-4 text-indigo-600">📋 Danh sách tài sản</h2>
+
+  <div class="flex space-x-2 mb-3" id="filter-container">
+    <select id="device-filter" class="flex-1 p-3 rounded-xl border shadow">
+      <option value="">-- Tất cả loại thiết bị --</option>
+    </select>
+    <input id="search" type="text" placeholder="🔍 Tìm kiếm..." class="flex-1 p-3 rounded-xl border shadow">
+  </div>
+
+  <div class="flex space-x-2 mb-4">
+    <button onclick="setStatusFilter('scanned')" class="flex-1 px-4 py-2 bg-green-200 text-green-700 rounded-xl shadow hover:bg-green-300">📗 Đã quét</button>
+    <button onclick="setStatusFilter('not_scanned')" class="flex-1 px-4 py-2 bg-red-200 text-red-700 rounded-xl shadow hover:bg-red-300">📕 Chưa quét</button>
+    <button onclick="setStatusFilter('all')" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-xl shadow hover:bg-gray-300">Tất cả</button>
+  </div>
+
+  <div id="stats" class="grid grid-cols-2 gap-4 mb-4"></div>
+  <div id="inventory-list" class="space-y-4"></div>
+</section>
+
+<!-- TAB ADD -->
+<section id="tab-add" class="tab hidden">
+  <h2 class="text-xl font-bold mb-4 text-indigo-600">➕ Thêm thiết bị mới</h2>
+  <form id="add-form" class="space-y-4">
+    <input id="add-qr" name="qr_code" type="text" placeholder="Mã QR" required class="w-full p-3 rounded-xl border shadow">
+    <input id="add-name" name="name" type="text" placeholder="Tên thiết bị" required class="w-full p-3 rounded-xl border shadow">
+    <select id="add-device-type" name="device_type_id" required class="w-full p-3 rounded-xl border shadow">
+      <option value="">-- Chọn loại thiết bị --</option>
+    </select>
+    <select id="add-department" name="department_id" required class="w-full p-3 rounded-xl border shadow">
+      <option value="">-- Chọn bộ phận --</option>
+    </select>
+    <input name="location" type="text" placeholder="Vị trí/Ghi chú" class="w-full p-3 rounded-xl border shadow">
+    <button type="submit" class="w-full bg-green-500 text-white p-3 rounded-xl shadow hover:bg-green-600">Lưu thiết bị</button>
+  </form>
+</section>
+
+</main>
+
+<nav class="bg-white shadow-inner border-t flex justify-around py-2">
+  <button onclick="showTab('tab-scan', this)" class="nav-btn flex flex-col items-center text-indigo-600">
+    <i class="ri-qr-code-line text-2xl"></i><span class="text-sm">Quét QR</span>
+  </button>
+  <button onclick="showTab('tab-inventory', this)" class="nav-btn flex flex-col items-center text-gray-500">
+    <i class="ri-file-list-3-line text-2xl"></i><span class="text-sm">Kiểm kê</span>
+  </button>
+  <button onclick="showTab('tab-add', this)" class="nav-btn flex flex-col items-center text-gray-500">
+    <i class="ri-add-circle-line text-2xl"></i><span class="text-sm">Thêm</span>
+  </button>
+</nav>
+
+<script>
+let qrScanner, scanning=false;
+let assets=[], statusFilter="all";
+
+// ================== SCANNER ==================
+function startScanner(){
+  if(scanning) return;
+  qrScanner = new Html5Qrcode("reader");
+  qrScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}}, qr=>{
+    fetch("/api/scan", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({user_id:currentUser.id, qr_code:qr})
+    }).then(r=>r.json()).then(data=>{
+      const result=document.getElementById("scan-result");
+      const addBtn=document.getElementById("add-new-btn");
+      if(data.success){
+        result.innerHTML=`✅ Quét thành công: <b>${data.device.name}</b>`;
+        addBtn.classList.add("hidden");
+        let asset=assets.find(a=>a.qr===qr);
+        if(asset) asset.scanned=true;
+        else assets.push({
+          qr:qr,
+          name:data.device.name,
+          device_type:data.device.device_type_name||"-",
+          dept:data.device.department_name||"Chưa rõ",
+          note:data.device.location||"",
+          scanned:true
+        });
+        renderInventory();
+      } else {
+        result.innerHTML=`⚠️ ${data.message}`;
+        addBtn.classList.remove("hidden");
+        document.getElementById("add-qr").value=qr;
+      }
+    });
+  }).then(()=>scanning=true);
+}
+
+function stopScanner(){
+  if(qrScanner && scanning){
+    qrScanner.stop().then(()=>{ scanning=false; document.getElementById("scan-result").innerText="⏹ Đã dừng quét"; });
+  }
+}
+
+// ================== INVENTORY ==================
+function setStatusFilter(status){ statusFilter=status; renderInventory(); }
+
+function renderInventory(){
+  const val = document.getElementById("search").value.toLowerCase();
+  const typeFilter = document.getElementById("device-filter").value;
+
+  let filtered = assets.filter(a=>{
+    const matchesType = !typeFilter || a.device_type===typeFilter;
+    const matchesStatus = statusFilter==="all" || 
+                          (statusFilter==="scanned" && a.scanned) || 
+                          (statusFilter==="not_scanned" && !a.scanned);
+    const matchesSearch = a.name.toLowerCase().includes(val) || a.qr.toLowerCase().includes(val);
+    return matchesType && matchesStatus && matchesSearch;
+  });
+
+  const stats={};
+  filtered.forEach(a=> stats[a.dept]=(stats[a.dept]||0)+1 );
+  document.getElementById("stats").innerHTML = Object.entries(stats).map(([d,c])=>`
+    <div class="bg-indigo-100 p-3 rounded-xl shadow text-center">
+      <div class="font-bold text-indigo-600">${d}</div>
+      <div class="text-lg">${c} thiết bị</div>
+    </div>`).join("");
+
+  document.getElementById("inventory-list").innerHTML = filtered.map(a=>`
+    <div class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-4 rounded-2xl shadow-md">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-bold">${a.name} (${a.device_type})</h3>
+        <span class="px-3 py-1 rounded-full text-sm ${a.scanned?'bg-green-400':'bg-red-400'}">
+          ${a.scanned?'Đã quét':'Chưa quét'}
+        </span>
+      </div>
+      <p class="text-sm">Mã QR: ${a.qr}</p>
+      <p class="text-sm">Bộ phận: ${a.dept}</p>
+      <p class="text-sm">${a.note||""}</p>
+    </div>`).join("");
+}
+
+// ================== ADD DEVICE ==================
+document.getElementById("add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const payload = Object.fromEntries(form.entries());
+
+  try {
+    const res = await fetch("/api/devices", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(data.success){
+      alert("✅ Đã thêm thiết bị!");
+      const deptText = document.getElementById("add-department").selectedOptions[0].text;
+      const typeText = document.getElementById("add-device-type").selectedOptions[0].text;
+      assets.push({
+        qr: payload.qr_code,
+        name: payload.name,
+        device_type: typeText,
+        dept: deptText,
+        note: payload.location,
+        scanned: false
+      });
+      renderInventory();
+      showTab('tab-inventory', document.querySelector("[onclick=\"showTab('tab-inventory', this)\"]"));
+      document.getElementById("add-form").reset();
+    } else alert("❌ Lỗi thêm thiết bị: "+data.message);
+  } catch(err){
+    console.error(err);
+    alert("❌ Lỗi server khi thêm thiết bị");
+  }
+});
+
+// ================== LOAD DROPDOWNS ==================
+async function loadDropdowns(){
+  try{
+    const depts = await (await fetch("/api/departments")).json();
+    const deptSelect = document.getElementById("add-department");
+    deptSelect.innerHTML = '<option value="">-- Chọn bộ phận --</option>';
+    depts.forEach(d=>{
+      let opt=document.createElement("option");
+      opt.value=d.id; opt.textContent=d.name;
+      deptSelect.appendChild(opt);
+    });
+
+    const types = await (await fetch("/api/device-types")).json();
+    const typeSelectAdd = document.getElementById("add-device-type");
+    const typeSelectFilter = document.getElementById("device-filter");
+    typeSelectAdd.innerHTML = '<option value="">-- Chọn loại thiết bị --</option>';
+    typeSelectFilter.innerHTML = '<option value="">-- Tất cả loại thiết bị --</option>';
+
+    types.forEach(t=>{
+      let optAdd=document.createElement("option");
+      optAdd.value=t.id; optAdd.textContent=t.name;
+      typeSelectAdd.appendChild(optAdd);
+
+      let optFilter=document.createElement("option");
+      optFilter.value=t.name; optFilter.textContent=t.name;
+      typeSelectFilter.appendChild(optFilter);
+    });
+  }catch(err){ console.error(err); }
+}
+
+// ================== LOAD DEVICES ==================
+async function loadDevices(){
+  try{
+    const res = await fetch("/api/devices");
+    const data = await res.json();
+    assets = data.map(d=>({
+      id:d.id,
+      name:d.name,
+      qr:d.qr_code,
+      device_type:d.device_type_name||"-",
+      dept:d.department_name||d.department||"Chưa rõ",
+      department_id:d.department_id||d.department?.id||null,
+      note:d.location||"",
+      scanned:d.status==="Đã quét"
+    }));
+
+    if(currentUser.role!=="admin") assets = assets.filter(d=>d.department_id===currentUser.department_id);
+    renderInventory();
+  }catch(err){ console.error(err); }
+}
+
+// ================== TAB SWITCH ==================
+function showTab(tabId, btn){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+  document.getElementById(tabId).classList.remove("hidden");
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("text-indigo-600"));
+  if(btn) btn.classList.add("text-indigo-600");
+  if(tabId==="tab-inventory") renderInventory();
+}
+function showAddForm(){ showTab('tab-add',document.querySelector("[onclick=\"showTab('tab-add', this)\"]")); }
+
+document.getElementById("search").addEventListener("input", renderInventory);
+document.getElementById("device-filter")?.addEventListener("change", renderInventory);
+
+// ================== INIT ==================
+document.addEventListener("DOMContentLoaded",()=>{
+  loadDropdowns();
+  loadDevices();
+});
+
+function goAdmin(){ window.location.href="/admin"; }
+function logout(){ window.location.href="/logout"; }
+</script>
+
+</body>
+</html>
