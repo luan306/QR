@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý tài sản</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
+  <style>
+    #reader { position: relative; width: 300px; height: 300px; margin: auto;
+      border: 2px solid rgba(0,255,0,0.5); border-radius: 12px; overflow: hidden;}
+    .laser { position: absolute; top:0; left:0; width:100%; height:2px;
+      background: lime; animation: scan 2s linear infinite;}
+    @keyframes scan {0%{top:0;}100%{top:100%;}}
+  </style>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+
+<script>
+const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+if (!currentUser.id) {
+  window.location.href = "login";
+}
+
+// Hiển thị tên user
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("welcome-user").innerText = "👋 Xin chào, " + currentUser.full_name;
+
+  // Nếu là admin thì hiện nút
+  if (currentUser.role === "admin") {
+    document.getElementById("admin-btn").classList.remove("hidden");
+  }
+});
+
+function goAdmin(){
+  window.location.href = "admin"; // 👉 chuyển qua trang admin riêng
+}
+</script>
+
+
+  <!-- HEADER -->
+  <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex justify-between items-center shadow-md">
+    <div class="flex items-center space-x-2">
+      <img src="https://cdn-icons-png.flaticon.com/512/1041/1041882.png" class="w-8 h-8">
+      <span class="font-bold text-lg">Asset Manager</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <span id="welcome-user" class="mr-3"></span>
+      <button id="admin-btn" onclick="goAdmin()" 
+              class="hidden bg-yellow-500 px-3 py-1 rounded-lg shadow hover:bg-yellow-600">
+        Trang Admin
+      </button>
+      <button onclick="logout()" class="bg-red-500 px-3 py-1 rounded-lg shadow hover:bg-red-600">Đăng xuất</button>
+    </div>
+  </header>
+
+
+  <!-- CONTENT -->
+  <main class="flex-1 p-4 overflow-y-auto">
+
+    <!-- TAB SCANNER -->
+    <section id="tab-scan" class="tab text-center">
+      <h2 class="text-xl font-bold mb-4 text-indigo-600">📷 Quét mã QR</h2>
+      <div id="reader"><div class="laser"></div></div>
+      <div id="scan-result" class="mt-4 text-gray-700"></div>
+      <div id="add-new-btn" class="mt-4 hidden">
+        <button onclick="showAddForm()" class="px-6 py-3 bg-green-500 text-white rounded-xl shadow hover:bg-green-600">
+          ➕ Thêm thiết bị mới
+        </button>
+      </div>
+      <div class="mt-4 flex justify-center space-x-3">
+        <button onclick="startScanner()" class="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">
+          Bắt đầu
+        </button>
+        <button onclick="stopScanner()" class="px-6 py-3 bg-red-500 text-white rounded-xl shadow hover:bg-red-600">
+          Ngừng
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB INVENTORY -->
+    <section id="tab-inventory" class="tab hidden">
+      <h2 class="text-xl font-bold mb-4 text-indigo-600">📋 Danh sách tài sản</h2>
+      <input id="search" type="text" placeholder="🔍 Tìm kiếm thiết bị..."
+             class="w-full p-3 rounded-xl border shadow mb-4">
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div id="stats" class="col-span-2 grid grid-cols-2 gap-4"></div>
+        <div class="bg-green-100 p-3 rounded-xl shadow text-center col-span-2 cursor-pointer hover:bg-green-200"
+             onclick="showScannedDevices()">
+          <div class="font-bold text-green-600">Đã quét</div>
+          <div id="scanned-count" class="text-lg">0 thiết bị</div>
+        </div>
+      </div>
+      <div id="inventory-list" class="space-y-4"></div>
+    </section>
+
+    <!-- TAB ADD -->
+    <section id="tab-add" class="tab hidden">
+      <h2 class="text-xl font-bold mb-4 text-indigo-600">➕ Thêm thiết bị mới</h2>
+      <form id="add-form" class="space-y-4">
+        <input id="add-qr" name="qr_code" type="text" placeholder="Mã QR" required 
+               class="w-full p-3 rounded-xl border shadow">
+        <select id="add-device-type" name="name" required
+                class="w-full p-3 rounded-xl border shadow">
+          <option value="">-- Chọn tên thiết bị --</option>
+        </select>
+        <select id="add-department" name="department_id" required
+                class="w-full p-3 rounded-xl border shadow">
+          <option value="">-- Chọn bộ phận --</option>
+        </select>
+        <input name="location" type="text" placeholder="Vị trí/Ghi chú" class="w-full p-3 rounded-xl border shadow">
+        <button type="submit" class="w-full bg-green-500 text-white p-3 rounded-xl shadow hover:bg-green-600">
+          Lưu thiết bị
+        </button>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- NAVIGATION -->
+  <nav class="bg-white shadow-inner border-t flex justify-around py-2">
+    <button onclick="showTab('tab-scan', this)" class="nav-btn flex flex-col items-center text-indigo-600">
+      <i class="ri-qr-code-line text-2xl"></i><span class="text-sm">Quét QR</span>
+    </button>
+    <button onclick="showTab('tab-inventory', this)" class="nav-btn flex flex-col items-center text-gray-500">
+      <i class="ri-file-list-3-line text-2xl"></i><span class="text-sm">Kiểm kê</span>
+    </button>
+    <button onclick="showTab('tab-add', this)" class="nav-btn flex flex-col items-center text-gray-500">
+      <i class="ri-add-circle-line text-2xl"></i><span class="text-sm">Thêm</span>
+    </button>
+  </nav>
+
+<script>
+let qrScanner, scanning=false;
+let assets=[];
+
+function logout(){
+  localStorage.removeItem("user");
+  window.location.href="login";
+}
+
+function showTab(tabId, btn){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+  document.getElementById(tabId).classList.remove("hidden");
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("text-indigo-600"));
+  btn.classList.add("text-indigo-600");
+  if(tabId==="tab-inventory") renderInventory();
+}
+
+function startScanner(){
+  if(scanning) return;
+  qrScanner=new Html5Qrcode("reader");
+  qrScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},qr=>{
+    fetch("/api/scan",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({user_id:currentUser.id,qr_code:qr})
+    }).then(r=>r.json()).then(data=>{
+      const result=document.getElementById("scan-result");
+      const addBtn=document.getElementById("add-new-btn");
+      if(data.success){
+        result.innerHTML=`✅ Quét thành công: <b>${data.device.name}</b>`;
+        addBtn.classList.add("hidden");
+        let asset=assets.find(a=>a.qr===qr);
+        if(asset) asset.scanned=true;
+        else assets.push({qr:qr,name:data.device.name,dept:data.device.department||"Chưa rõ",note:data.device.location||"",scanned:true});
+        renderInventory();
+      }else{
+        result.innerHTML=`⚠️ ${data.message}`;
+        addBtn.classList.remove("hidden");
+        document.getElementById("add-qr").value=qr;
+      }
+    });
+  }).then(()=>scanning=true);
+}
+function stopScanner(){ if(qrScanner&&scanning){qrScanner.stop().then(()=>{scanning=false;document.getElementById("scan-result").innerText="⏹ Đã dừng quét";});}}
+
+function renderInventory(){
+  const val=document.getElementById("search").value.toLowerCase();
+  const filtered=assets.filter(a=>a.name?.toLowerCase().includes(val)||a.qr.toLowerCase().includes(val)||a.dept?.toLowerCase().includes(val));
+  const stats={}; filtered.forEach(a=>{stats[a.dept]=(stats[a.dept]||0)+1;});
+  document.getElementById("stats").innerHTML=Object.entries(stats).map(([d,c])=>`
+    <div class="bg-indigo-100 p-3 rounded-xl shadow text-center">
+      <div class="font-bold text-indigo-600">${d}</div><div class="text-lg">${c} thiết bị</div></div>`).join("");
+  document.getElementById("scanned-count").innerText=assets.filter(a=>a.scanned).length+" thiết bị";
+  document.getElementById("inventory-list").innerHTML=filtered.map(a=>`
+    <div class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-4 rounded-2xl shadow-md">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-bold">${a.name}</h3>
+        <span class="px-3 py-1 rounded-full text-sm ${a.scanned?'bg-green-400':'bg-red-400'}">${a.scanned?'Đã quét':'Chưa quét'}</span>
+      </div>
+      <p class="text-sm">Mã QR: ${a.qr}</p>
+      <p class="text-sm">Bộ phận: ${a.dept}</p>
+      <p class="text-sm">${a.note||""}</p>
+    </div>`).join("");
+}
+function showScannedDevices(){alert("📋 Danh sách đã quét:\n\n"+assets.filter(a=>a.scanned).map(a=>`- ${a.name} (${a.qr})`).join("\n"));}
+function showAddForm(){showTab('tab-add',document.querySelector("[onclick=\"showTab('tab-add', this)\"]"));}
+
+document.getElementById("search").addEventListener("input",renderInventory);
+document.getElementById("add-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const form=new FormData(e.target);
+  let payload=Object.fromEntries(form.entries());
+  let res=await fetch("/api/devices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  let data=await res.json();
+  if(data.success){alert("✅ Đã thêm thiết bị!");assets.push({qr:payload.qr_code,name:payload.name,dept:payload.department_id,note:payload.location,scanned:false});renderInventory();showTab('tab-inventory',document.querySelector("[onclick=\"showTab('tab-inventory', this)\"]"));}else{alert("❌ Lỗi thêm thiết bị: "+data.message);}
+});
+
+async function loadDropdowns(){
+  try{
+    let depts=await (await fetch("/api/departments")).json();
+    document.getElementById("add-department").innerHTML='<option value="">-- Chọn bộ phận --</option>'+depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join("");
+    let types=await (await fetch("/api/device-types")).json();
+    document.getElementById("add-device-type").innerHTML='<option value="">-- Chọn tên thiết bị --</option>'+types.map(t=>`<option value="${t.name}">${t.name}</option>`).join("");
+  }catch(err){console.error("❌ Lỗi load dropdown:",err);}
+}
+async function loadScanned() {
+  try {
+    let res = await fetch("/api/scans");
+    let scans = await res.json();
+
+    scans.forEach(s => {
+      let asset = assets.find(a => a.qr === s.qr_code);
+      if (asset) {
+        asset.scanned = true;
+      } else {
+        assets.push({
+          qr: s.qr_code,
+          name: s.device_name,
+          dept: s.department || "Chưa rõ",
+          note: s.location || "",
+          scanned: true
+        });
+      }
+    });
+
+    renderInventory();
+  } catch (err) {
+    console.error("❌ Lỗi load scans:", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadDropdowns();
+  loadScanned();
+});
+</script>
+
+</body>
+</html>

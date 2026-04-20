@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Kiểm kê</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <div class="bg-indigo-600 text-white p-4 flex items-center justify-between shadow">
+    <div class="flex items-center space-x-3">
+      <img id="userAvatar" src="https://i.pravatar.cc/40" class="w-10 h-10 rounded-full border-2 border-white">
+      <div>
+        <div id="usernameDisplay" class="font-bold"></div>
+        <div id="departmentDisplay" class="text-sm opacity-80"></div>
+      </div>
+    </div>
+    <button onclick="logout()" class="bg-red-500 px-3 py-1 rounded-lg shadow">Thoát</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="p-4 grid grid-cols-3 gap-4 text-center">
+    <div class="bg-white shadow rounded-xl p-4">
+      <div class="text-lg font-bold text-indigo-600">Tổng</div>
+      <div id="totalDevices" class="text-2xl font-bold">0</div>
+    </div>
+    <div class="bg-white shadow rounded-xl p-4">
+      <div class="text-lg font-bold text-green-600">Đã quét</div>
+      <div id="scannedDevices" class="text-2xl font-bold">0</div>
+    </div>
+    <div class="bg-white shadow rounded-xl p-4">
+      <div class="text-lg font-bold text-red-600">Chưa quét</div>
+      <div id="pendingDevices" class="text-2xl font-bold">0</div>
+    </div>
+  </div>
+
+  <!-- QR Scanner -->
+  <div class="flex-grow flex justify-center items-center p-4">
+    <div id="reader" class="border-4 border-green-500 rounded-xl shadow-lg" style="width:300px;height:300px;"></div>
+  </div>
+
+  <!-- Chức năng -->
+  <div class="p-4 flex space-x-2">
+    <button onclick="openAdd()" class="flex-1 bg-green-500 text-white p-3 rounded-lg shadow">➕ Thêm thiết bị</button>
+    <button onclick="openAllList()" class="flex-1 bg-indigo-500 text-white p-3 rounded-lg shadow">📋 Danh sách</button>
+  </div>
+
+  <!-- Modal thêm thiết bị -->
+  <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-xl w-96 shadow-lg">
+      <h3 class="font-bold text-lg mb-4">Thêm thiết bị</h3>
+      <input id="seriInput" placeholder="Số Seri" class="border p-2 w-full mb-2 rounded">
+      <input id="modelInput" placeholder="Model" class="border p-2 w-full mb-2 rounded">
+      <input id="locationInput" placeholder="Vị trí" class="border p-2 w-full mb-2 rounded">
+      <button onclick="saveDevice()" class="bg-green-600 text-white px-4 py-2 rounded shadow">Lưu</button>
+      <button onclick="closeAdd()" class="ml-2 bg-gray-400 px-4 py-2 rounded">Hủy</button>
+    </div>
+  </div>
+
+  <!-- Modal danh sách -->
+  <div id="allListModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white w-11/12 md:w-4/5 max-h-[80vh] overflow-y-auto rounded-xl p-6 shadow-lg">
+      <h3 class="text-lg font-bold mb-4">Danh sách thiết bị</h3>
+      <table class="w-full text-sm border">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="p-2 border">Số Seri</th>
+            <th class="p-2 border">Model</th>
+            <th class="p-2 border">Bộ phận</th>
+            <th class="p-2 border">Vị trí</th>
+            <th class="p-2 border">Trạng thái</th>
+            <th class="p-2 border">Sửa</th>
+          </tr>
+        </thead>
+        <tbody id="allDeviceTable"></tbody>
+      </table>
+      <div class="mt-4 text-right">
+        <button onclick="closeAllList()" class="px-4 py-2 bg-red-500 text-white rounded">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Lấy dữ liệu
+    let devices = JSON.parse(localStorage.getItem("devices")||"[]");
+    let loggedUser = localStorage.getItem("loggedInUser");
+    let loggedDep = localStorage.getItem("loggedDepartment");
+
+    document.getElementById("usernameDisplay").innerText = loggedUser;
+    document.getElementById("departmentDisplay").innerText = loggedDep;
+
+    function logout(){
+      localStorage.removeItem("loggedInUser");
+      window.location="login.html";
+    }
+
+    // QR Scanner
+    function onScanSuccess(decodedText){
+      let dev = devices.find(d => d.seri === decodedText && d.department === loggedDep);
+      if(dev){
+        dev.status = "Đã quét";
+        localStorage.setItem("devices", JSON.stringify(devices));
+        renderDevices();
+        alert("✅ Đã quét: "+dev.seri+" ("+dev.model+")");
+      } else {
+        alert("❌ Thiết bị không thuộc bộ phận của bạn hoặc chưa có trong danh sách!");
+      }
+    }
+
+    let scanner = new Html5QrcodeScanner("reader", { fps:10, qrbox:{width:250,height:250} });
+    scanner.render(onScanSuccess);
+
+    // Render thống kê
+    function renderDevices(){
+      let userDevices = devices.filter(d => d.department===loggedDep);
+      document.getElementById("totalDevices").innerText = userDevices.length;
+      document.getElementById("scannedDevices").innerText = userDevices.filter(d=>d.status==="Đã quét").length;
+      document.getElementById("pendingDevices").innerText = userDevices.filter(d=>d.status!=="Đã quét").length;
+    }
+    renderDevices();
+
+    // Thêm thiết bị
+    function openAdd(){document.getElementById("addModal").classList.remove("hidden");}
+    function closeAdd(){document.getElementById("addModal").classList.add("hidden");}
+    function saveDevice(){
+      let s=document.getElementById("seriInput").value;
+      let m=document.getElementById("modelInput").value;
+      let l=document.getElementById("locationInput").value;
+      if(!s||!m){alert("Vui lòng nhập đầy đủ!");return;}
+      devices.push({seri:s,model:m,department:loggedDep,location:l,status:"Chưa quét"});
+      localStorage.setItem("devices", JSON.stringify(devices));
+      closeAdd(); renderDevices();
+    }
+
+    // Danh sách
+    function openAllList(){document.getElementById("allListModal").classList.remove("hidden");renderAllDevices();}
+    function closeAllList(){document.getElementById("allListModal").classList.add("hidden");}
+    function renderAllDevices(){
+      let tbody=document.getElementById("allDeviceTable"); tbody.innerHTML="";
+      let list=devices.filter(d=>d.department===loggedDep);
+      list.forEach((d,idx)=>{
+        let tr=document.createElement("tr");
+        tr.innerHTML=`
+          <td class="border p-2">${d.seri}</td>
+          <td class="border p-2">${d.model}</td>
+          <td class="border p-2">${d.department}</td>
+          <td class="border p-2">${d.location||"-"}</td>
+          <td class="border p-2 font-bold ${d.status==="Đã quét"?"text-green-600":"text-red-600"}">${d.status}</td>
+          <td class="border p-2"><button onclick="editDeviceLocation(${idx})" class="px-2 py-1 bg-blue-500 text-white rounded text-xs">✏️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+    function editDeviceLocation(index){
+      let newLoc=prompt("Nhập vị trí mới:");
+      if(newLoc){
+        let list=devices.filter(d=>d.department===loggedDep);
+        let dev=list[index];
+        let globalIndex=devices.findIndex(d=>d.seri===dev.seri);
+        devices[globalIndex].location=newLoc;
+        localStorage.setItem("devices", JSON.stringify(devices));
+        renderAllDevices(); renderDevices();
+      }
+    }
+  </script>
+</body>
+</html>

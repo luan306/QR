@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Kiểm kê tài sản</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex h-screen">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-indigo-700 text-white flex flex-col">
+    <div class="p-4 text-2xl font-bold border-b border-indigo-500">🛠️ Admin Panel</div>
+    <nav class="flex-1 p-4 space-y-2">
+      <button onclick="showTab('dashboard')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">📊 Dashboard</button>
+      <button onclick="showTab('users')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">👤 Quản lý User</button>
+      <button onclick="showTab('devices')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">💻 Quản lý Thiết bị</button>
+      <button onclick="showTab('reports')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">📋 Báo cáo</button>
+    </nav>
+    <div class="p-4 border-t border-indigo-500">
+      <button onclick="logout()" class="w-full py-2 bg-red-500 rounded-lg">🚪 Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 p-6 overflow-y-auto">
+    <!-- Dashboard -->
+    <section id="dashboard" class="tab">
+      <h2 class="text-2xl font-bold mb-4">📊 Thống kê chung</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow"><h3 class="text-lg">Tổng số thiết bị</h3><p id="totalDevices" class="text-3xl font-bold text-indigo-600">0</p></div>
+        <div class="bg-white p-6 rounded-xl shadow"><h3 class="text-lg">Đã quét</h3><p id="scannedDevices" class="text-3xl font-bold text-green-600">0</p></div>
+        <div class="bg-white p-6 rounded-xl shadow"><h3 class="text-lg">Chưa quét</h3><p id="pendingDevices" class="text-3xl font-bold text-red-600">0</p></div>
+      </div>
+    </section>
+
+    <!-- Users -->
+    <section id="users" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">👤 Quản lý User</h2>
+      <form id="userForm" class="bg-white p-6 rounded-xl shadow space-y-4 max-w-md">
+        <input type="text" id="newUser" placeholder="Tên đăng nhập" class="w-full p-3 border rounded-lg">
+        <input type="password" id="newPass" placeholder="Mật khẩu" class="w-full p-3 border rounded-lg">
+        <select id="department" class="w-full p-3 border rounded-lg">
+          <option>Phòng IT</option>
+          <option>Phòng Kế Toán</option>
+          <option>Phòng Nhân Sự</option>
+          <option>Phòng Kinh Doanh</option>
+        </select>
+        <button type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-lg">+ Tạo User</button>
+      </form>
+      <div class="mt-6 bg-white p-4 rounded-xl shadow">
+        <h3 class="font-semibold mb-2">Danh sách User</h3>
+        <ul id="userList" class="space-y-2 text-gray-700"></ul>
+      </div>
+    </section>
+
+    <!-- Devices -->
+    <section id="devices" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">💻 Quản lý Thiết bị</h2>
+      <div class="bg-white p-6 rounded-xl shadow space-y-4">
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" class="w-full p-3 border rounded-lg">
+        <button onclick="importExcel()" class="px-6 py-2 bg-green-600 text-white rounded-lg">📥 Nhập Excel</button>
+        <table class="w-full mt-4 border text-sm">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="p-2 border">Số Seri</th>
+              <th class="p-2 border">Model</th>
+              <th class="p-2 border">Bộ phận</th>
+              <th class="p-2 border">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody id="deviceTable" class="text-center"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Reports -->
+    <section id="reports" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">📋 Báo cáo</h2>
+      <div class="bg-white p-6 rounded-xl shadow">
+        <p class="mb-4">Danh sách thiết bị đã quét:</p>
+        <ul id="scannedList" class="space-y-2 text-green-700 font-medium"></ul>
+        <div class="mt-6 text-center">
+          <button onclick="exportReport()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg">📤 Xuất báo cáo Excel</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    let users = JSON.parse(localStorage.getItem("users") || "[]");
+    let devices = JSON.parse(localStorage.getItem("devices") || "[]");
+    let scanned = [];
+
+    function showTab(tabId){
+      document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+    }
+    function logout(){ window.location.href = "login.html"; }
+
+    // User form
+    document.getElementById("userForm").addEventListener("submit", e=>{
+      e.preventDefault();
+      let u = document.getElementById("newUser").value;
+      let p = document.getElementById("newPass").value;
+      let d = document.getElementById("department").value;
+      users.push({user:u, pass:p, dep:d});
+      localStorage.setItem("users", JSON.stringify(users));
+      renderUsers();
+    });
+    function renderUsers(){
+      let list = document.getElementById("userList");
+      list.innerHTML = "";
+      users.forEach(u=>{
+        let li = document.createElement("li");
+        li.textContent = `${u.user} (${u.dep})`;
+        list.appendChild(li);
+      });
+    }
+
+    // Import Excel
+    function importExcel(){
+      let file = document.getElementById("excelFile").files[0];
+      if(!file) return alert("Chưa chọn file!");
+      let reader = new FileReader();
+      reader.onload = e=>{
+        let data = new Uint8Array(e.target.result);
+        let workbook = XLSX.read(data, {type:"array"});
+        let sheet = workbook.Sheets[workbook.SheetNames[0]];
+        let json = XLSX.utils.sheet_to_json(sheet);
+        devices = json.map(r => ({
+          seri: r["Số Seri"] || "",
+          model: r["Model"] || "",
+          department: r["Bộ phận"] || "Chưa phân loại",
+          status: "Chưa quét"
+        }));
+        localStorage.setItem("devices", JSON.stringify(devices));
+        renderDevices();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function renderDevices(){
+      let tbody = document.getElementById("deviceTable");
+      tbody.innerHTML = "";
+      devices.forEach(d=>{
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="border p-2">${d.seri}</td>
+          <td class="border p-2">${d.model}</td>
+          <td class="border p-2">${d.department}</td>
+          <td class="border p-2 ${d.status==='Đã quét'?'text-green-600':'text-red-600'}">${d.status}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById("totalDevices").textContent = devices.length;
+      document.getElementById("scannedDevices").textContent = devices.filter(d=>d.status==='Đã quét').length;
+      document.getElementById("pendingDevices").textContent = devices.filter(d=>d.status==='Chưa quét').length;
+    }
+
+    function exportReport(){
+      if(devices.filter(d=>d.status==='Đã quét').length===0){ alert("⚠️ Chưa có thiết bị nào được quét!"); return; }
+      let ws_data = [["Số Seri","Model","Bộ phận","Trạng thái"]];
+      devices.filter(d=>d.status==='Đã quét').forEach(d=>{ ws_data.push([d.seri,d.model,d.department,d.status]); });
+      let ws = XLSX.utils.aoa_to_sheet(ws_data);
+      let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
+      XLSX.writeFile(wb, "BaoCaoThietBiDaQuet.xlsx");
+    }
+
+    renderUsers(); renderDevices();
+  </script>
+</body>
+</html>

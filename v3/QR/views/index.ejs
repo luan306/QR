@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Quản lý tài sản</title>
+<link rel="stylesheet" href="css/tailwind.min.css">
+<link rel="stylesheet" href="css/remixicon.css">
+<link rel="stylesheet" href="css/remixicon-4.9.1/package/fonts/remixicon.css">
+
+
+<style>
+  #reader-wrap { position: relative; width: 320px; max-width: 92vw; height: 320px; max-height: 60vh; margin: auto; border-radius: 16px; overflow: hidden; background: #000; }
+  #qr-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .laser { position: absolute; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, rgba(0,255,150,0.9), rgba(0,200,255,0.9)); animation: scan 2s linear infinite; top: 0; }
+  @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+<header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex items-center justify-between">
+  <div class="flex items-center space-x-3">
+    <img src="https://cdn-icons-png.flaticon.com/512/1041/1041882.png" class="w-8 h-8" alt="logo">
+    <div>
+      <div class="font-bold text-lg">Asset Manager</div>
+      <div class="text-xs opacity-80">Quản lý & kiểm kê tài sản</div>
+    </div>
+  </div>
+  <div class="flex items-center space-x-3">
+    <div id="welcome-user" class="text-sm">👋 Xin chào</div>
+    <button id="admin-btn" class="bg-yellow-400 text-gray-800 px-3 py-1 rounded-lg hidden" onclick="goAdmin()">Trang Admin</button>
+    <button onclick="logout()" class="bg-red-500 px-3 py-1 rounded-lg shadow hover:bg-red-600">Đăng xuất</button>
+  </div>
+</header>
+
+<main class="flex-1 p-4 overflow-auto pb-20">
+
+  <!-- TAB SCANNER -->
+  <section id="tab-scan" class="tab text-center">
+    <h2 class="text-xl font-bold mb-4 text-indigo-600">📷 Quét mã QR</h2>
+    <div id="reader-wrap">
+      <video id="qr-video" playsinline muted></video>
+      <div class="laser"></div>
+    </div>
+    <div id="scan-result" class="mt-4 text-gray-700">Chưa quét mã</div>
+    <div id="add-new-btn" class="mt-4 hidden">
+      <button onclick="showTab('tab-add')" class="px-6 py-3 bg-green-500 text-white rounded-xl shadow hover:bg-green-600">➕ Thêm thiết bị mới</button>
+    </div>
+    <div class="mt-4 flex justify-center space-x-3">
+      <button id="start-btn" onclick="startScanner()" class="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">Bắt đầu</button>
+      <button id="stop-btn" onclick="stopScanner()" class="px-6 py-3 bg-red-500 text-white rounded-xl shadow hover:bg-red-600" disabled>Ngừng</button>
+    </div>
+  </section>
+
+  <!-- TAB INVENTORY -->
+  <section id="tab-inventory" class="tab hidden mt-6">
+    <h2 class="text-xl font-bold mb-4 text-indigo-600">📋 Danh sách tài sản</h2>
+    <div class="flex flex-col sm:flex-row sm:space-x-2 mb-3">
+      <select id="device-filter" class="flex-1 p-3 rounded-xl border shadow mb-2 sm:mb-0">
+        <option value="">-- Tất cả loại thiết bị --</option>
+      </select>
+      <input id="search" type="text" placeholder="🔍 Tìm kiếm..." class="flex-1 p-3 rounded-xl border shadow">
+    </div>
+    <div class="flex flex-wrap gap-2 mb-4">
+      <button onclick="setStatusFilter('scanned')" class="flex-1 px-4 py-2 bg-green-200 text-green-700 rounded-xl shadow hover:bg-green-300">📗 Đã quét</button>
+      <button onclick="setStatusFilter('not_scanned')" class="flex-1 px-4 py-2 bg-red-200 text-red-700 rounded-xl shadow hover:bg-red-300">📕 Chưa quét</button>
+      <button onclick="setStatusFilter('all')" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-xl shadow hover:bg-gray-300">Tất cả</button>
+      <button onclick="downloadScans()" class="px-4 py-2 bg-green-600 text-white rounded-xl shadow">📥 Tải danh sách đã quét</button>
+    </div>
+    <div id="stats" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4"></div>
+    <div id="inventory-list" class="space-y-4"></div>
+  </section>
+
+  <!-- TAB ADD -->
+  <section id="tab-add" class="tab hidden mt-6">
+    <h2 class="text-xl font-bold mb-4 text-indigo-600">➕ Thêm thiết bị mới</h2>
+    <form id="add-form" class="space-y-4">
+      <input id="add-qr" name="qr_code" type="text" placeholder="Mã QR" required class="w-full p-3 rounded-xl border shadow">
+      <input id="add-name" name="name" type="text" placeholder="Tên thiết bị" required class="w-full p-3 rounded-xl border shadow">
+      <select id="add-device-type" name="device_type_id" required class="w-full p-3 rounded-xl border shadow">
+        <option value="">-- Chọn loại thiết bị --</option>
+      </select>
+      <select id="add-department" name="department_id" required class="w-full p-3 rounded-xl border shadow">
+        <option value="">-- Chọn bộ phận --</option>
+      </select>
+      <input id="add-location" name="location" type="text" placeholder="Vị trí / Ghi chú" class="w-full p-3 rounded-xl border shadow">
+      <div class="flex space-x-2">
+        <button type="submit" class="flex-1 bg-green-500 text-white p-3 rounded-xl shadow hover:bg-green-600">Lưu thiết bị</button>
+        <button type="button" onclick="showTab('tab-inventory')" class="flex-1 bg-gray-200 text-gray-700 p-3 rounded-xl shadow hover:bg-gray-300">Hủy</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- TAB AUDIT -->
+  <section id="tab-audit" class="tab hidden mt-6">
+    <h2 class="text-xl font-bold mb-4 text-indigo-600">🧾 Audit tài sản</h2>
+
+    <!-- Trạng thái đang chạy -->
+    <div id="audit-running-banner" class="hidden mb-3 bg-indigo-50 border border-indigo-300 rounded-xl p-3 flex items-center justify-between">
+      <div>
+        <span class="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse mr-2"></span>
+        <span class="text-sm font-semibold text-indigo-700">Đang audit: </span>
+        <span id="audit-dept-name" class="text-sm text-indigo-900 font-bold"></span>
+      </div>
+      <span class="text-xs text-gray-400" id="audit-session-time"></span>
+    </div>
+
+    <div class="bg-white p-4 rounded-xl shadow space-y-3">
+      <select id="audit-department" class="w-full p-3 rounded-xl border">
+        <option value="">-- Chọn bộ phận cần audit --</option>
+      </select>
+      <div class="flex space-x-2">
+        <button id="btn-start-audit" onclick="startAudit()" class="flex-1 bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700">▶️ Bắt đầu Audit</button>
+        <button id="btn-stop-audit" onclick="stopAudit()" class="flex-1 bg-red-500 text-white p-3 rounded-xl hover:bg-red-600" disabled>⏹ Kết thúc</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mt-4">
+      <div class="bg-green-100 p-3 rounded-xl text-center">
+        <div class="text-2xl font-bold text-green-700" id="audit-scanned">0</div>
+        <div class="text-sm text-green-800">Đã quét</div>
+      </div>
+      <div class="bg-red-100 p-3 rounded-xl text-center">
+        <div class="text-2xl font-bold text-red-700" id="audit-not-scanned">0</div>
+        <div class="text-sm text-red-800">Chưa quét</div>
+      </div>
+    </div>
+
+    <!-- Danh sách thiết bị cần audit -->
+    <div id="audit-device-list" class="hidden mt-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold text-gray-700">📋 Danh sách thiết bị cần kiểm kê</h3>
+        <div class="flex gap-3 text-sm">
+          <span class="text-green-600 font-semibold">✅ Đã quét: <span id="audit-count-scanned">0</span></span>
+          <span class="text-red-500 font-semibold">⬜ Chưa quét: <span id="audit-count-remaining">0</span></span>
+        </div>
+      </div>
+
+      <!-- Progress bar tổng -->
+      <div class="w-full bg-gray-100 rounded-full h-2 mb-3">
+        <div id="audit-progress-bar" class="bg-indigo-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+      </div>
+
+      <div id="audit-device-table" class="space-y-2 max-h-96 overflow-y-auto pr-1"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="bg-white shadow-inner border-t flex justify-around py-2 fixed bottom-0 left-0 right-0">
+  <button data-tab="tab-scan" onclick="showTab('tab-scan', this)" class="nav-btn flex flex-col items-center text-indigo-600">
+    <i class="ri-qr-code-line text-2xl"></i><span class="text-sm">Quét QR</span>
+  </button>
+  <button data-tab="tab-inventory" onclick="showTab('tab-inventory', this)" class="nav-btn flex flex-col items-center text-gray-500">
+    <i class="ri-file-list-3-line text-2xl"></i><span class="text-sm">Kiểm kê</span>
+  </button>
+  <button id="nav-add" data-tab="tab-add" onclick="showTab('tab-add', this)" class="nav-btn flex flex-col items-center text-gray-500 hidden">
+    <i class="ri-add-circle-line text-2xl"></i><span class="text-sm">Thêm</span>
+  </button>
+  <button id="nav-audit" data-tab="tab-audit" onclick="showTab('tab-audit', this)" class="nav-btn flex flex-col items-center text-gray-500 hidden">
+    <i class="ri-survey-line text-2xl"></i><span class="text-sm">Audit</span>
+  </button>
+</nav>
+
+<!-- Toast -->
+<div id="scan-success-toast"
+     class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-5 py-3 rounded-2xl shadow-lg text-lg font-semibold hidden z-50 transition-all duration-300">
+  ✅ Quét thành công!
+</div>
+
+<audio id="beep-sound" preload="auto">
+  <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
+</audio>
+
+<!-- ============================================================
+     FIX 1: Tách showTab ra script thường (không phải module)
+             để onclick HTML inline gọi được
+     ============================================================ -->
+<script>
+  // showTab phải ở global scope — KHÔNG đặt trong type="module"
+  function showTab(tabId, btn) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+    document.getElementById(tabId).classList.remove('hidden');
+
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.classList.remove('text-indigo-600');
+      b.classList.add('text-gray-500');
+    });
+
+    document.querySelectorAll('[data-tab]').forEach(el => {
+      el.classList.remove('text-indigo-600');
+      el.classList.add('text-gray-500');
+    });
+
+    const nav = document.querySelector(`[data-tab="${tabId}"]`);
+    if (nav) {
+      nav.classList.add('text-indigo-600');
+      nav.classList.remove('text-gray-500');
+    }
+
+    if (tabId === 'tab-inventory') {
+      // renderInventory được expose ra window trong module bên dưới
+      if (typeof window.renderInventory === 'function') window.renderInventory();
+    }
+  }
+
+  function logout()  { window.location.href = '/logout'; }
+  function goAdmin() { window.location.href = '/admin'; }
+</script>
+
+<!-- ============================================================
+     FIX 2: Xóa khối try/catch thừa nằm ngoài hàm (gây SyntaxError)
+             Gộp toàn bộ logic vào 1 module duy nhất, sạch sẽ
+     ============================================================ -->
+<script type="module">
+  import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
+
+
+  // ── State ──────────────────────────────────────────────────
+  let qrScanner       = null;
+  let scanning        = false;
+  let assets          = [];
+  let statusFilter    = "all";
+  let currentUser     = {};
+  let auditDepartmentId = null;
+  let auditSessionId    = null;   // FIX 3: khai báo thiếu trong bản gốc
+
+  const recentScans       = new Map();
+  const DUPLICATE_WINDOW_MS = 1500;
+
+  // ── Helpers ────────────────────────────────────────────────
+  function canProcessQr(qr) {
+    const t = recentScans.get(qr);
+    return !t || (Date.now() - t) > DUPLICATE_WINDOW_MS;
+  }
+  function markQrProcessed(qr) { recentScans.set(qr, Date.now()); }
+
+  // ── Current user ───────────────────────────────────────────
+  async function loadCurrentUser() {
+    try {
+      const res  = await fetch('/api/current-user');
+      if (!res.ok) throw new Error('no current user');
+      const data = await res.json();
+      currentUser = data.user || data;
+      if (!currentUser?.id) { window.location.href = "/login"; return; }
+      document.getElementById("welcome-user").innerText =
+        "👋 Xin chào, " + (currentUser.full_name || currentUser.name || 'User');
+      applyRoleUI(currentUser.role);
+    } catch (err) {
+      console.warn('Không lấy được current user — dùng demo', err);
+      currentUser = { id: 1, full_name: 'IT', role: 'admin' };
+      document.getElementById("welcome-user").innerText = "👋 Xin chào, " + currentUser.full_name;
+      applyRoleUI('admin');
+    }
+  }
+
+  // ── Role-based UI ──────────────────────────────────────────
+  // admin   → tất cả tab + nút Admin
+  // auditor → Quét QR, Kiểm kê, Audit (KHÔNG thấy Thêm)
+  // user    → Quét QR, Kiểm kê, Thêm (KHÔNG thấy Audit)
+  function applyRoleUI(role) {
+    const isAdmin   = role === 'admin';
+    const isAuditor = role === 'auditor';
+    const isUser    = role === 'user';
+
+    // Nút Admin trên header — chỉ admin
+    document.getElementById('admin-btn')?.classList.toggle('hidden', !isAdmin);
+
+    // Tab Thêm — tất cả đều thấy (user, auditor, admin)
+    document.getElementById('nav-add')?.classList.remove('hidden');
+
+    // Tab Audit — auditor + admin, user KHÔNG thấy
+    document.getElementById('nav-audit')?.classList.toggle('hidden', !(isAdmin || isAuditor));
+
+    // Chặn user truy cập tab audit
+    if (isUser) {
+      document.getElementById('tab-audit')?.classList.add('hidden');
+    }
+  }
+
+  // ── Scanner ────────────────────────────────────────────────
+  window.startScanner = async function () {
+    if (scanning) return;
+    const video = document.getElementById('qr-video');
+    qrScanner = new QrScanner(video, result => {
+      const qr = String(typeof result === 'string' ? result : (result.data || result)).trim();
+      if (!qr || !canProcessQr(qr)) return;
+      markQrProcessed(qr);
+      onQrScanned(qr);
+    }, { highlightScanRegion: true, returnDetailedScanResult: false });
+
+    try {
+      await qrScanner.start();
+      scanning = true;
+      document.getElementById('scan-result').innerText = '🔍 Đang quét...';
+      document.getElementById('start-btn').disabled = true;
+      document.getElementById('stop-btn').disabled  = false;
+    } catch (err) {
+      console.error('Không thể truy cập camera', err);
+      alert('Không thể truy cập camera. Hãy kiểm tra quyền camera hoặc mở trên HTTPS.');
+    }
+  };
+
+  window.stopScanner = function () {
+    if (qrScanner && scanning) qrScanner.stop();
+    scanning = false;
+    document.getElementById('scan-result').innerText = '⏹ Đã dừng quét';
+    document.getElementById('start-btn').disabled = false;
+    document.getElementById('stop-btn').disabled  = true;
+  };
+
+  // ── onQrScanned ────────────────────────────────────────────
+  window.onQrScanned = async function (qr) {
+    document.getElementById('scan-result').innerHTML = `⏳ Xử lý QR: <b>${qr}</b>`;
+
+    try {
+      // Backend chỉ có /api/scan — dùng cho cả scan thường lẫn audit
+      // Khi audit: truyền thêm session_id để backend tự lấy department_id từ audit_sessions
+      const apiUrl = '/api/scan';
+
+      const body = {
+        user_id:    currentUser.id,
+        qr_code:    qr,
+        session_id: auditSessionId || null
+      };
+
+      const res  = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({ success: false, message: "Dữ liệu lỗi từ server" }));
+
+      const addBtn = document.getElementById('add-new-btn');
+
+      if (data?.success) {
+        document.getElementById('scan-result').innerHTML = `
+          ✅ <b>${data.device_name || "-"}</b><br>
+          🏢 Thuộc: ${data.device_department || "-"}<br>
+          📍 Quét tại: ${data.scan_department || "-"}<br>
+          ⚡ ${data.status || ""}`;
+        addBtn.classList.add('hidden');
+        let asset = assets.find(a => a.qr === qr);
+        if (asset) { asset.scanned = true; }
+        else {
+          assets.push({ qr, name: data.device_name || 'Không rõ', device_type: '-',
+            dept: data.device_department || 'Chưa rõ', note: '', scanned: true });
+        }
+        showScanSuccess(`✅ ${data.device_name}`);
+        // Cập nhật real-time danh sách audit nếu đang trong phiên audit
+        if (auditDepartmentId) {
+          markAuditDeviceScanned(qr);
+        } else {
+          // Chỉ reload inventory khi quét thường (không phải audit)
+          await loadDevices();
+          window.renderInventory();
+        }
+        return;
+      }
+
+      if (data?.not_in_list) {
+        document.getElementById('scan-result').innerHTML = `
+          ❌ <b>${data.device_name || "-"}</b><br>
+          ${data.message}<br>📍 ${data.status || ""}`;
+        addBtn.classList.add('hidden');
+        showScanError("Không thuộc bộ phận audit");
+        return;
+      }
+
+      if (data?.already) {
+        document.getElementById('scan-result').innerHTML = `
+          ⚠️ <b>${data.device_name || "-"}</b><br>
+          ${data.message}<br>📍 ${data.status || ""}`;
+        addBtn.classList.add('hidden');
+        showScanError("Đã quét trong phiên này");
+        // Vẫn đánh dấu trong danh sách nếu chưa được tick
+        if (auditDepartmentId) markAuditDeviceScanned(qr);
+        return;
+      }
+
+      const message = data?.message || "Không tìm thấy thiết bị";
+      document.getElementById('scan-result').innerHTML = `⚠️ ${message}`;
+      addBtn.classList.remove('hidden');
+      document.getElementById('add-qr').value = qr;
+      showScanError(message);
+
+    } catch (err) {
+      console.error('Lỗi gọi API', err);
+      document.getElementById('scan-result').innerText = '⚠️ Lỗi kết nối server';
+      document.getElementById('add-new-btn').classList.remove('hidden');
+      document.getElementById('add-qr').value = qr;
+      showScanError('Lỗi server');
+    }
+  }
+
+  // ── Audit helpers ──────────────────────────────────────────
+  async function updateAuditStats() {
+    if (!auditSessionId) return;
+    try {
+      const res  = await fetch(`/api/scan/audit-summary/${auditSessionId}`);
+      const data = await res.json();
+      document.getElementById('audit-scanned').innerText     = data.total   || 0;
+      document.getElementById('audit-not-scanned').innerText = data.correct || 0;
+    } catch (err) { console.error("Lỗi stats audit", err); }
+  }
+
+  // Danh sách thiết bị audit (dùng để update real-time khi quét)
+  let auditDevices = [];
+
+  window.startAudit = async function () {
+    const sel  = document.getElementById('audit-department');
+    const dept = sel.value;
+    if (!dept) {
+      sel.classList.add('border-red-400');
+      setTimeout(() => sel.classList.remove('border-red-400'), 1500);
+      return;
+    }
+    const deptName = sel.options[sel.selectedIndex].text;
+
+    try {
+      const res  = await fetch('/api/scan/start-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id, department_id: dept })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        // Nếu đang có session cũ chưa kết thúc → tiếp tục session đó
+        if (data.session_id) {
+          auditDepartmentId = dept;
+          auditSessionId    = data.session_id;
+        } else {
+          alert('❌ ' + (data.message || 'Không thể bắt đầu audit'));
+          return;
+        }
+      } else {
+        auditDepartmentId = dept;
+        auditSessionId    = data.session_id;
+      }
+    } catch (err) {
+      console.error('Lỗi start-audit', err);
+      auditDepartmentId = dept;
+      auditSessionId    = Date.now();
+    }
+
+    document.getElementById('audit-running-banner').classList.remove('hidden');
+    document.getElementById('audit-dept-name').innerText = deptName;
+    document.getElementById('audit-session-time').innerText =
+      new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('audit-department').disabled = true;
+    document.getElementById('btn-start-audit').disabled  = true;
+    document.getElementById('btn-stop-audit').disabled   = false;
+
+    // Load danh sách thiết bị của bộ phận
+    await loadAuditDevices(auditDepartmentId);
+  };
+
+  window.stopAudit = async function () {
+    if (auditSessionId) {
+      try {
+        await fetch('/api/scan/stop-audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: auditSessionId })
+        });
+      } catch (err) { console.error('Lỗi stop-audit', err); }
+    }
+
+    auditDepartmentId = null;
+    auditSessionId    = null;
+    auditDevices      = [];
+
+    document.getElementById('audit-running-banner').classList.add('hidden');
+    document.getElementById('audit-device-list').classList.add('hidden');
+    document.getElementById('audit-device-table').innerHTML = '';
+    document.getElementById('audit-department').disabled = false;
+    document.getElementById('btn-start-audit').disabled  = false;
+    document.getElementById('btn-stop-audit').disabled   = true;
+    document.getElementById('audit-scanned').innerText     = "0";
+    document.getElementById('audit-not-scanned').innerText = "0";
+    document.getElementById('audit-count-scanned').innerText   = "0";
+    document.getElementById('audit-count-remaining').innerText = "0";
+    document.getElementById('audit-progress-bar').style.width  = "0%";
+  };
+
+  async function loadAuditDevices(deptId) {
+    try {
+      const res  = await fetch('/api/devices');
+      const data = await res.json();
+
+      // Lọc thiết bị theo department_id
+      auditDevices = Array.isArray(data)
+        ? data.filter(d => String(d.department_id) === String(deptId))
+        : [];
+
+      // Nếu có session → load danh sách đã quét trong session để đánh dấu sẵn
+      if (auditSessionId) {
+        try {
+          const sr = await fetch(`/api/scans/session/${auditSessionId}`);
+          if (sr.ok) {
+            const scannedList = await sr.json();
+            const scannedQrs  = new Set(scannedList.map(s => s.qr_code));
+            auditDevices.forEach(d => {
+              if (scannedQrs.has(d.qr_code)) d.scanned = true;
+            });
+          }
+        } catch(e) { /* Nếu API chưa có thì bỏ qua */ }
+      }
+
+      renderAuditDevices();
+      document.getElementById('audit-device-list').classList.remove('hidden');
+    } catch (err) {
+      console.error('loadAuditDevices error', err);
+    }
+  }
+
+  function renderAuditDevices() {
+    const container  = document.getElementById('audit-device-table');
+    const total      = auditDevices.length;
+    const scannedCount = auditDevices.filter(d => d.scanned).length;
+
+    container.innerHTML = auditDevices.map(d => `
+      <div id="audit-dev-${d.id}" class="flex items-center justify-between p-3 rounded-xl border ${d.scanned ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}">
+        <div>
+          <div class="font-medium text-gray-800 text-sm">${d.name}</div>
+          <div class="text-xs text-gray-400">QR: ${d.qr_code}${d.location ? ' · ' + d.location : ''}</div>
+        </div>
+        <span id="audit-dev-status-${d.id}" class="px-3 py-1 rounded-full text-xs font-semibold ${d.scanned ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}">
+          ${d.scanned ? '✅ Đã quét' : '⬜ Chưa quét'}
+        </span>
+      </div>`).join('') || '<p class="text-gray-400 text-sm text-center py-4">Không có thiết bị nào</p>';
+
+    updateAuditCounter();
+  }
+
+  function updateAuditCounter() {
+    const total        = auditDevices.length;
+    const scannedCount = auditDevices.filter(d => d.scanned).length;
+    const remaining    = total - scannedCount;
+    const pct          = total > 0 ? Math.round(scannedCount * 100 / total) : 0;
+
+    document.getElementById('audit-count-scanned').innerText   = scannedCount;
+    document.getElementById('audit-count-remaining').innerText = remaining;
+    document.getElementById('audit-progress-bar').style.width  = pct + '%';
+    document.getElementById('audit-scanned').innerText         = scannedCount;
+    document.getElementById('audit-not-scanned').innerText     = remaining;
+  }
+
+  // Gọi sau khi quét thành công — cập nhật row real-time
+  function markAuditDeviceScanned(qrCode) {
+    console.log("[AUDIT] markAuditDeviceScanned called:", qrCode);
+    console.log("[AUDIT] auditDevices:", auditDevices.map(d => d.qr_code));
+
+    // Chuẩn hoá QR giống backend (cắt $ nếu có)
+    const normalizedQr = qrCode.includes('$') ? qrCode.split('$')[0].trim() : qrCode.trim();
+
+    const device = auditDevices.find(d => {
+      const dqr = (d.qr_code || d.qr || '').trim();
+      return dqr === normalizedQr || dqr === qrCode.trim();
+    });
+
+    console.log("[AUDIT] matched device:", device);
+    if (!device || device.scanned) return;
+
+    device.scanned = true;
+
+    const row = document.getElementById(`audit-dev-${device.id}`);
+    if (row) {
+      row.className = 'flex items-center justify-between p-3 rounded-xl border bg-green-50 border-green-200';
+    }
+    const statusEl = document.getElementById(`audit-dev-status-${device.id}`);
+    if (statusEl) {
+      statusEl.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700';
+      statusEl.innerText = '✅ Đã quét';
+    }
+    updateAuditCounter();
+  }
+
+  // ── Toast / Sound ──────────────────────────────────────────
+  function showScanSuccess(message = '✅ Quét thành công!') {
+    const toast = document.getElementById('scan-success-toast');
+    try { const b = document.getElementById('beep-sound'); b.currentTime = 0; b.play().catch(() => {}); } catch (e) {}
+    toast.textContent = message;
+    toast.style.backgroundColor = '#16a34a';
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 1200);
+  }
+
+  function showScanError(message = '⚠️ Lỗi') {
+    const toast = document.getElementById('scan-success-toast');
+    try { const b = document.getElementById('beep-sound'); b.currentTime = 0; b.play().catch(() => {}); } catch (e) {}
+    toast.textContent = message;
+    toast.style.backgroundColor = '#dc2626';
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 1500);
+  }
+
+  // ── Dropdowns ──────────────────────────────────────────────
+  async function loadDropdowns() {
+    try {
+      const resDepts = await fetch('/api/departments');
+      if (resDepts.ok) {
+        const depts     = await resDepts.json();
+        const deptSelect  = document.getElementById('add-department');
+        const auditSelect = document.getElementById('audit-department');
+        deptSelect.innerHTML  = '<option value="">-- Chọn bộ phận --</option>';
+        auditSelect.innerHTML = '<option value="">-- Chọn bộ phận audit --</option>';
+        depts.forEach(d => {
+          [deptSelect, auditSelect].forEach(sel => {
+            const opt = document.createElement('option');
+            opt.value = d.id; opt.textContent = d.name;
+            sel.appendChild(opt);
+          });
+        });
+      }
+
+      const resTypes = await fetch('/api/device-types');
+      if (resTypes.ok) {
+        const types     = await resTypes.json();
+        const typeAdd    = document.getElementById('add-device-type');
+        const typeFilter = document.getElementById('device-filter');
+        typeAdd.innerHTML    = '<option value="">-- Chọn loại thiết bị --</option>';
+        typeFilter.innerHTML = '<option value="">-- Tất cả loại thiết bị --</option>';
+        types.forEach(t => {
+          const o1 = document.createElement('option'); o1.value = t.id;   o1.textContent = t.name; typeAdd.appendChild(o1);
+          const o2 = document.createElement('option'); o2.value = t.name; o2.textContent = t.name; typeFilter.appendChild(o2);
+        });
+      }
+    } catch (err) { console.error('Lỗi loadDropdowns', err); }
+  }
+
+  // ── Devices ────────────────────────────────────────────────
+  async function loadDevices() {
+    try {
+      const res  = await fetch('/api/devices');
+      if (!res.ok) throw new Error('no devices');
+      const data = await res.json();
+      assets = data.map(d => ({
+        id:            d.id,
+        name:          d.name,
+        qr:            d.qr_code,
+        device_type:   d.device_type_name || '-',
+        dept:          d.department_name || d.department || 'Chưa rõ',
+        department_id: d.department_id || (d.department?.id) || null,
+        note:          d.location || '',
+        scanned:       d.status === "Đã quét" || d.status === "scanned"
+      }));
+      if (currentUser.role && currentUser.role !== "admin") {
+        assets = assets.filter(a => a.department_id === currentUser.department_id);
+      }
+      window.renderInventory();
+    } catch (err) {
+      console.warn('Không load được devices', err);
+      assets = [];
+      window.renderInventory();
+    }
+  }
+
+  // ── Inventory render ───────────────────────────────────────
+  window.setStatusFilter = function (status) { statusFilter = status; window.renderInventory(); };
+
+  window.renderInventory = function () {
+    const val        = (document.getElementById('search')?.value || '').toLowerCase();
+    const typeFilter = document.getElementById('device-filter')?.value || '';
+
+    const filtered = assets.filter(a => {
+      const matchType   = !typeFilter || a.device_type === typeFilter;
+      const matchStatus = statusFilter === 'all' ||
+        (statusFilter === 'scanned' && a.scanned) ||
+        (statusFilter === 'not_scanned' && !a.scanned);
+      const matchSearch = (a.name || '').toLowerCase().includes(val) || (a.qr || '').toLowerCase().includes(val);
+      return matchType && matchStatus && matchSearch;
+    });
+
+    const stats = {};
+    filtered.forEach(a => stats[a.dept] = (stats[a.dept] || 0) + 1);
+    document.getElementById('stats').innerHTML = Object.entries(stats).map(([d, c]) => `
+      <div class="bg-indigo-100 p-3 rounded-xl shadow text-center">
+        <div class="font-bold text-indigo-600">${d}</div>
+        <div class="text-lg">${c} thiết bị</div>
+      </div>`).join('') || '<div class="text-sm text-gray-500">Không có dữ liệu</div>';
+
+    document.getElementById('inventory-list').innerHTML = filtered.map(a => `
+      <div class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
+        <div class="text-left">
+          <div class="text-lg font-bold">${a.name} <span class="text-sm font-medium">(${a.device_type})</span></div>
+          <div class="text-xs opacity-90">Mã QR: ${a.qr}</div>
+          <div class="text-xs opacity-90">Bộ phận: ${a.dept}</div>
+          <div class="text-xs opacity-90">${a.note || ''}</div>
+        </div>
+        <div class="ml-4">
+          <span class="px-3 py-1 rounded-full text-sm ${a.scanned ? 'bg-green-400 text-green-900' : 'bg-red-400 text-red-900'}">
+            ${a.scanned ? 'Đã quét' : 'Chưa quét'}
+          </span>
+        </div>
+      </div>`).join('') || '<div class="text-sm text-gray-500">Không có thiết bị</div>';
+  };
+
+  // ── Add form ───────────────────────────────────────────────
+  document.getElementById('add-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const payload = Object.fromEntries(new FormData(e.target).entries());
+    try {
+      const res  = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (data?.success) {
+        const deptText = document.getElementById('add-department').selectedOptions[0]?.text || '';
+        const typeText = document.getElementById('add-device-type').selectedOptions[0]?.text || '';
+        assets.push({ qr: payload.qr_code, name: payload.name, device_type: typeText, dept: deptText, note: payload.location || '', scanned: false });
+        alert('✅ Đã thêm thiết bị!');
+        e.target.reset();
+        showTab('tab-inventory');
+        window.renderInventory();
+      } else {
+        alert('❌ Lỗi thêm: ' + (data?.message || 'Unknown'));
+      }
+    } catch (err) {
+      console.error('Lỗi khi thêm thiết bị', err);
+      alert('❌ Lỗi server khi thêm thiết bị');
+    }
+  });
+
+  // ── Export Excel ───────────────────────────────────────────
+  window.downloadScans = async function () {
+    try {
+      const res  = await fetch("/api/scans/export");
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) { alert("⚠️ Chưa có dữ liệu"); return; }
+      const rows = [["QR Code","Tên thiết bị","Thuộc bộ phận","Quét tại","Người quét","Thời gian"]];
+      data.forEach(s => rows.push([s.qr_code||"", s.device_name||"", s.device_department||"", s.scan_department||"", s.user_name||"", s.scanned_at||""]));
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Scans");
+      XLSX.writeFile(wb, "DanhSachDaQuet.xlsx");
+    } catch (err) { console.error(err); alert("❌ Lỗi tải file"); }
+  };
+
+ 
+// ── MC3300 / Zebra Scanner (DataWedge) ─────────────────────
+
+let scanBuffer = "";
+let lastInputTime = Date.now();
+
+document.addEventListener("keydown", function (e) {
+  const now = Date.now();
+
+  if (now - lastInputTime > 100) {
+    scanBuffer = "";
+  }
+  lastInputTime = now;
+
+  if (e.key === "Enter") {
+    if (scanBuffer.length > 0) {
+      let qr = scanBuffer.trim();
+
+      if (qr.includes("$")) {
+        qr = qr.split("$")[0].trim();
+      }
+
+      console.log("📡 SCAN:", qr);
+
+      if (canProcessQr(qr)) {
+        markQrProcessed(qr);
+        onQrScanned(qr);
+      }
+
+      scanBuffer = "";
+    }
+    return;
+  }
+
+  if (e.key.length === 1) {
+    scanBuffer += e.key;
+  }
+});
+window.fakeScan = function (text) {
+  text.split("").forEach(ch => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: ch }));
+  });
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+};
+  // ── Init ───────────────────────────────────────────────────
+  async function init() {
+    await loadCurrentUser();
+    await loadDropdowns();
+    await loadDevices();
+    showTab('tab-scan');
+    document.getElementById('stop-btn').disabled = true;
+  }
+
+  document.getElementById('search')?.addEventListener('input', window.renderInventory);
+  document.getElementById('device-filter')?.addEventListener('change', window.renderInventory);
+
+  // Load preview danh sách thiết bị ngay khi chọn bộ phận audit
+  document.getElementById('audit-department')?.addEventListener('change', async function() {
+    const deptId = this.value;
+    if (!deptId) {
+      document.getElementById('audit-device-list').classList.add('hidden');
+      auditDevices = [];
+      return;
+    }
+    await loadAuditDevices(deptId);
+  });
+
+  init();
+
+  
+
+</script>
+
+</body>
+</html>
