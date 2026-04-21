@@ -1,0 +1,28 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tailwind base override — đảm bảo không bị khoảng trắng 2 bên */
+.min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh; /* mobile-safe height */
+}
+
+/* Responsive fix cho mobile */
+@media (max-width: 640px) {
+  .text-2xl { font-size: 1.25rem; }
+  .p-6      { padding: 1rem; }
+}

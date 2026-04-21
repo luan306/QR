@@ -7,498 +7,867 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .progress-bar { transition: width 0.8s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+    .fade-in { animation: fadeIn 0.35s ease both; }
+    .sidebar-btn { width:100%; text-align:left; padding:8px 16px; border-radius:8px; transition:background 0.15s; }
+    .sidebar-btn:hover { background: rgba(255,255,255,0.15); }
+    .sidebar-btn.active { background: rgba(255,255,255,0.2); font-weight:600; }
+  </style>
 </head>
-<body class="bg-gray-100 flex h-screen">
-  <!-- Sidebar -->
-  <aside class="w-64 bg-indigo-700 text-white flex flex-col">
-    <div class="p-4 text-2xl font-bold border-b border-indigo-500">🛠️ Admin Panel</div>
-    <nav class="flex-1 p-4 space-y-2">
-      <button onclick="showTab('dashboard')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">📊 Dashboard</button>
-      <button onclick="showTab('users')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">👤 Quản lý User</button>
-      <button onclick="showTab('devices')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">💻 Quản lý Thiết bị</button>
-      <button onclick="showTab('reports')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-indigo-600">📋 Báo cáo</button>
-    </nav>
-    <div class="p-4 border-t border-indigo-500">
-      <button onclick="logout()" class="w-full py-2 bg-red-500 rounded-lg">🚪 Đăng xuất</button>
+<body class="bg-gray-100 flex h-screen overflow-hidden">
+
+<!-- Sidebar -->
+<aside class="w-64 bg-indigo-700 text-white flex flex-col flex-shrink-0">
+  <div class="p-4 text-2xl font-bold border-b border-indigo-500">🛠️ Admin Panel</div>
+  <nav class="flex-1 p-4 space-y-1">
+    <button id="nav-dashboard"   onclick="showTab('dashboard')"   class="sidebar-btn">📊 Dashboard</button>
+    <button id="nav-users"       onclick="showTab('users')"       class="sidebar-btn">👤 Quản lý User</button>
+    <button id="nav-devices"     onclick="showTab('devices')"     class="sidebar-btn">💻 Quản lý Thiết bị</button>
+    <button id="nav-deviceTypes" onclick="showTab('deviceTypes')" class="sidebar-btn">📦 Loại thiết bị</button>
+    <button id="nav-reports"     onclick="showTab('reports')"     class="sidebar-btn">📋 Báo cáo</button>
+    <button id="nav-audit"       onclick="showTab('audit')"       class="sidebar-btn">🔍 Audit</button>
+  </nav>
+  <div class="p-4 border-t border-indigo-500">
+    <button onclick="logout()" class="w-full py-2 bg-red-500 rounded-lg hover:bg-red-600">🚪 Đăng xuất</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="flex-1 p-6 overflow-y-auto">
+
+  <!-- Dashboard -->
+  <section id="dashboard" class="tab fade-in">
+    <h2 class="text-2xl font-bold mb-6">📊 Thống kê quét thiết bị</h2>
+    <div class="bg-white p-6 rounded-xl shadow mb-8 flex justify-center">
+      <div class="w-48 h-48"><canvas id="overallChart"></canvas></div>
     </div>
-  </aside>
+    <div class="bg-white p-6 rounded-xl shadow mb-8">
+      <h3 class="text-lg font-semibold mb-4">Theo bộ phận</h3>
+      <canvas id="deptChart" height="120"></canvas>
+    </div>
+    <div id="deptDevices" class="bg-white p-6 rounded-xl shadow hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">📋 Chi tiết bộ phận: <span id="deptName"></span></h3>
+        <button onclick="exportDept()" class="px-4 py-2 bg-green-600 text-white rounded">📤 Xuất Excel</button>
+      </div>
+      <table class="w-full border text-sm bg-white rounded-xl shadow">
+        <thead><tr class="bg-gray-200">
+          <th class="p-2 border">QR Code</th><th class="p-2 border">Tên thiết bị</th>
+          <th class="p-2 border">Vị trí</th><th class="p-2 border">Trạng thái</th>
+        </tr></thead>
+        <tbody id="deptDeviceTable"></tbody>
+      </table>
+    </div>
+    <div class="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6 mt-8">
+      <h3 class="text-lg font-bold text-gray-700 mb-4">📂 Danh sách Bộ phận</h3>
+      <div id="departments-list" class="divide-y divide-gray-200">
+        <% departments.forEach(dep => { %>
+          <div class="flex justify-between items-center py-2">
+            <span class="text-gray-800 font-medium"><%= dep.name %></span>
+            <button onclick="deleteDepartment(<%= dep.id %>, this)" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">❌ Xóa</button>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </section>
 
-  <!-- Main -->
-  <main class="flex-1 p-6 overflow-y-auto">
-    <!-- Dashboard -->
-    <section id="dashboard" class="tab">
-      <h2 class="text-2xl font-bold mb-6">📊 Thống kê quét thiết bị</h2>
+  <!-- Users -->
+  <section id="users" class="tab hidden fade-in">
+    <h2 class="text-2xl font-bold mb-4">👤 Quản lý User</h2>
+    <form id="userForm" class="bg-white p-6 rounded-xl shadow space-y-4 max-w-md">
+      <input type="text"     id="newUser"   placeholder="Tên đăng nhập" class="w-full p-3 border rounded-lg">
+      <input type="password" id="newPass"   placeholder="Mật khẩu"      class="w-full p-3 border rounded-lg">
+      <input type="text"     id="fullName"  placeholder="Họ tên"         class="w-full p-3 border rounded-lg">
+      <select id="department" class="w-full p-3 border rounded-lg">
+        <% departments.forEach(dep => { %>
+          <option value="<%= dep.id %>"><%= dep.name %></option>
+        <% }); %>
+      </select>
+      <select id="role" class="w-full p-3 border rounded-lg">
+        <option value="user">User</option>
+        <option value="auditor">Auditor</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-lg">+ Tạo User</button>
+    </form>
+    <div class="mt-6 bg-white p-4 rounded-xl shadow">
+      <h3 class="font-semibold mb-2">Danh sách User</h3>
+      <table class="w-full border text-sm">
+        <thead><tr class="bg-gray-200">
+          <th class="p-2 border">ID</th><th class="p-2 border">Tên đăng nhập</th>
+          <th class="p-2 border">Họ tên</th><th class="p-2 border">Bộ phận</th>
+          <th class="p-2 border">Role</th><th class="p-2 border">Hành động</th>
+        </tr></thead>
+        <tbody id="userTable"></tbody>
+      </table>
+    </div>
+  </section>
 
-      <!-- Tổng quan -->
-      <div class="bg-white p-6 rounded-xl shadow mb-8 flex justify-center">
-        <div class="w-48 h-48">
-          <canvas id="overallChart"></canvas>
+  <!-- Modal Edit User -->
+  <div id="editUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-xl w-96">
+      <h3 class="text-xl font-bold mb-4">✏️ Chỉnh sửa User</h3>
+      <input type="hidden" id="editUserId">
+      <input type="text"     id="editFullName"   placeholder="Họ tên"    class="w-full p-3 border rounded-lg mb-3">
+      <input type="password" id="editPass"        placeholder="Mật khẩu mới (để trống nếu không đổi)" class="w-full p-3 border rounded-lg mb-3">
+      <select id="editDepartment" class="w-full p-3 border rounded-lg mb-3">
+        <% departments.forEach(dep => { %>
+          <option value="<%= dep.id %>"><%= dep.name %></option>
+        <% }); %>
+      </select>
+      <select id="editRole" class="w-full p-3 border rounded-lg mb-4">
+        <option value="user">User</option>
+        <option value="auditor">Auditor</option>
+        <option value="admin">Admin</option>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-400 text-white rounded-lg">Hủy</button>
+        <button onclick="saveUserEdit()"   class="px-4 py-2 bg-blue-600 text-white rounded-lg">💾 Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device Types -->
+  <section id="deviceTypes" class="tab hidden fade-in">
+    <h2 class="text-2xl font-bold mb-4">📦 Quản lý loại thiết bị</h2>
+    <div class="bg-white p-6 rounded-xl shadow">
+      <div class="flex gap-2 mb-4">
+        <input id="newDeviceType" class="border p-2 rounded w-60" placeholder="Tên loại thiết bị">
+        <button onclick="addDeviceType()" class="bg-indigo-600 text-white px-4 py-2 rounded">+ Thêm</button>
+      </div>
+      <table class="w-full border text-sm">
+        <thead><tr class="bg-gray-200">
+          <th class="p-2 border">ID</th><th class="p-2 border">Tên</th><th class="p-2 border">Hành động</th>
+        </tr></thead>
+        <tbody id="deviceTypeTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Devices -->
+  <section id="devices" class="tab hidden fade-in">
+    <h2 class="text-2xl font-bold mb-4">💻 Quản lý Thiết bị</h2>
+    <div class="bg-white p-6 rounded-xl shadow space-y-4">
+      <button onclick="window.location.href='<%= apiUrl %>/devices/export'" class="bg-blue-500 text-white px-4 py-2 rounded">⬇️ Tải danh sách thiết bị</button>
+      <button onclick="downloadDeviceTemplate()" class="px-6 py-2 bg-green-600 text-white rounded-lg">📥 Tải Excel mẫu</button>
+      <div class="mt-4 flex gap-2">
+        <input type="file" id="excelFile" accept=".xlsx,.xls" class="border p-2 rounded">
+        <button onclick="uploadExcel()" class="px-6 py-2 bg-purple-600 text-white rounded-lg">📤 Upload Excel</button>
+        <button id="deleteAllDevicesBtn" class="px-6 py-2 bg-red-500 text-white rounded-lg">🗑️ Xóa tất cả thiết bị</button>
+      </div>
+      <table class="w-full mt-4 border text-sm">
+        <thead><tr class="bg-gray-200">
+          <th class="p-2 border">ID</th><th class="p-2 border">Tên Thiết Bị</th>
+          <th class="p-2 border">Loại thiết bị</th><th class="p-2 border">Bộ phận</th>
+          <th class="p-2 border">Trạng thái</th><th class="p-2 border">Hành động</th>
+        </tr></thead>
+        <tbody id="deviceTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Reports -->
+  <section id="reports" class="tab hidden fade-in">
+    <h2 class="text-2xl font-bold mb-4">📋 Báo cáo</h2>
+    <div class="bg-white p-6 rounded-xl shadow">
+      <p class="mb-4">Danh sách thiết bị đã quét:</p>
+      <ul id="scannedList" class="space-y-2 text-green-700 font-medium"></ul>
+      <div class="mt-6 text-center space-x-3">
+        <button onclick="exportReport()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg">📤 Xuất báo cáo Excel</button>
+        <button onclick="clearReports()" class="px-6 py-3 bg-red-600 text-white rounded-lg">🗑️ Xóa tất cả báo cáo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- AUDIT TAB                                 -->
+  <!-- ══════════════════════════════════════════ -->
+  <section id="audit" class="tab hidden fade-in">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold">🔍 Audit tài sản</h2>
+      <button onclick="loadAudit()" class="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+        🔄 Làm mới
+      </button>
+    </div>
+
+    <!-- Tổng quan nhanh -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <div class="text-3xl font-bold text-indigo-600" id="as-total">—</div>
+        <div class="text-sm text-gray-500 mt-1">Tổng thiết bị</div>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <div class="text-3xl font-bold text-green-600" id="as-scanned">—</div>
+        <div class="text-sm text-gray-500 mt-1">Đã audit</div>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <div class="text-3xl font-bold text-red-500" id="as-remaining">—</div>
+        <div class="text-sm text-gray-500 mt-1">Chưa audit</div>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow text-center">
+        <div class="text-3xl font-bold text-purple-600" id="as-sessions">—</div>
+        <div class="text-sm text-gray-500 mt-1">Phiên audit</div>
+        <div id="as-active" class="hidden mt-1 inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block"></span>
+          <span id="as-active-count">0</span> đang chạy
         </div>
       </div>
+    </div>
 
-      <!-- Thống kê theo bộ phận -->
-      <div class="bg-white p-6 rounded-xl shadow mb-8">
-        <h3 class="text-lg font-semibold mb-4">Theo bộ phận</h3>
-        <canvas id="deptChart" height="120"></canvas>
-      </div>
-
-      <!-- Chi tiết bộ phận -->
-      <div id="deptDevices" class="bg-white p-6 rounded-xl shadow hidden">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-bold">📋 Chi tiết bộ phận: <span id="deptName"></span></h3>
-          <button onclick="exportDept()" class="px-4 py-2 bg-green-600 text-white rounded">📤 Xuất Excel</button>
+    <!-- BỘ LỌC: ngày + bộ phận -->
+    <div class="bg-white rounded-xl shadow p-4 mb-6">
+      <div class="flex flex-wrap gap-3 items-end">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-500 font-medium">Từ ngày</label>
+          <input type="date" id="filter-date-from" class="border p-2 rounded-lg text-sm">
         </div>
-        <table class="w-full border text-sm bg-white rounded-xl shadow">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-500 font-medium">Đến ngày</label>
+          <input type="date" id="filter-date-to" class="border p-2 rounded-lg text-sm">
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-500 font-medium">Bộ phận</label>
+          <select id="filter-dept" class="border p-2 rounded-lg text-sm min-w-40">
+            <option value="">-- Tất cả --</option>
+            <% departments.forEach(dep => { %>
+              <option value="<%= dep.id %>"><%= dep.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <button onclick="applyAuditFilter()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
+          🔍 Lọc
+        </button>
+        <button onclick="resetAuditFilter()" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-300">
+          ✖ Xóa lọc
+        </button>
+      </div>
+    </div>
+
+    <!-- Tiến độ từng bộ phận -->
+    <div class="bg-white rounded-xl shadow p-6 mb-6">
+      <h3 class="font-bold text-gray-700 mb-4">🏢 Tiến độ theo bộ phận</h3>
+      <div id="audit-dept-progress" class="space-y-4">
+        <p class="text-gray-400 text-sm">Đang tải...</p>
+      </div>
+    </div>
+
+    <!-- Lịch sử phiên audit -->
+    <div class="bg-white rounded-xl shadow p-6 mb-6">
+      <h3 class="font-bold text-gray-700 mb-4">
+        📅 Lịch sử phiên audit
+        <span class="text-xs font-normal text-gray-400 ml-2" id="session-filter-label"></span>
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
           <thead>
-            <tr class="bg-gray-200">
-              <th class="p-2 border">QR Code</th>
-              <th class="p-2 border">Tên thiết bị</th>
-              <th class="p-2 border">Vị trí</th>
-              <th class="p-2 border">Trạng thái</th>
+            <tr class="text-left text-gray-400 border-b text-xs uppercase tracking-wide">
+              <th class="pb-2 pr-3">Kiểm kê viên</th>
+              <th class="pb-2 pr-3">Bộ phận</th>
+              <th class="pb-2 pr-3">Bắt đầu</th>
+              <th class="pb-2 pr-3">Thời gian</th>
+              <th class="pb-2 pr-3 text-center">Đã quét</th>
+              <th class="pb-2 text-center">Trạng thái</th>
+              <th class="pb-2 text-center">Thao tác</th>
             </tr>
           </thead>
-          <tbody id="deptDeviceTable"></tbody>
+          <tbody id="audit-sessions-table">
+            <tr><td colspan="7" class="py-4 text-center text-gray-400 text-sm">Đang tải...</td></tr>
+          </tbody>
         </table>
       </div>
+    </div>
 
-      <!-- 📂 Quản lý bộ phận -->
-      <div class="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6 mt-8">
-        <h3 class="text-lg font-bold text-gray-700 mb-4">📂 Danh sách Bộ phận</h3>
-        <div id="departments-list" class="divide-y divide-gray-200">
-          <% departments.forEach(dep => { %>
-            <div class="flex justify-between items-center py-2">
-              <span class="text-gray-800 font-medium"><%= dep.name %></span>
-              <button onclick="deleteDepartment(<%= dep.id %>, this)" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">
-                ❌ Xóa
-              </button>
+    <!-- So sánh chi tiết (hiện khi bấm nút So sánh) -->
+    <div id="audit-compare-box" class="hidden bg-white rounded-xl shadow p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-gray-700" id="audit-compare-title">📊 So sánh chi tiết</h3>
+        <div class="flex gap-2">
+          <button onclick="exportAuditCompare()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
+            📥 Tải Excel
+          </button>
+          <button onclick="document.getElementById('audit-compare-box').classList.add('hidden')"
+            class="bg-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm">✖ Đóng</button>
+        </div>
+      </div>
+      <!-- Thống kê nhanh -->
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div class="bg-green-50 rounded-xl p-3 text-center">
+          <div class="text-2xl font-bold text-green-600" id="cmp-audited">0</div>
+          <div class="text-xs text-gray-500">Đã audit</div>
+        </div>
+        <div class="bg-red-50 rounded-xl p-3 text-center">
+          <div class="text-2xl font-bold text-red-500" id="cmp-missing">0</div>
+          <div class="text-xs text-gray-500">Chưa audit</div>
+        </div>
+        <div class="bg-indigo-50 rounded-xl p-3 text-center">
+          <div class="text-2xl font-bold text-indigo-600" id="cmp-total">0</div>
+          <div class="text-xs text-gray-500">Tổng thiết bị</div>
+        </div>
+      </div>
+      <!-- Bảng chi tiết -->
+      <div class="overflow-x-auto max-h-96">
+        <table class="w-full text-sm">
+          <thead class="sticky top-0 bg-white">
+            <tr class="text-left text-gray-400 border-b text-xs uppercase">
+              <th class="pb-2 pr-3">Thiết bị</th>
+              <th class="pb-2 pr-3">QR Code</th>
+              <th class="pb-2 pr-3">Vị trí</th>
+              <th class="pb-2 pr-3">Người quét</th>
+              <th class="pb-2 pr-3">Thời gian</th>
+              <th class="pb-2 text-center">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody id="audit-compare-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  const API = window.location.origin + "/api";
+  const currentUser = <%- JSON.stringify(user) %>;
+
+  if (!currentUser.id) {
+    window.location.href = "/login";
+  } else if (currentUser.role !== "admin") {
+    alert("🚫 Bạn không có quyền Admin!");
+    window.location.href = "/index";
+  }
+
+  // ── Tab switching ──────────────────────────────────────────
+  function showTab(tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.remove('hidden');
+    document.getElementById('nav-' + tabId)?.classList.add('active');
+    if (tabId === "dashboard")   loadCharts();
+    if (tabId === "users")       fetchUsers();
+    if (tabId === "devices")     fetchDevices();
+    if (tabId === "reports")     fetchReports();
+    if (tabId === "deviceTypes") fetchDeviceTypes();
+    if (tabId === "audit")       loadAudit();
+  }
+
+  function logout() { window.location.href = "/logout"; }
+
+  // ── AUDIT ──────────────────────────────────────────────────
+  let currentCompareData = []; // lưu data để export Excel
+
+  async function loadAudit(dateFrom, dateTo, deptId) {
+    try {
+      // 1. Tiến độ bộ phận
+      const deptRes  = await fetch(API + "/stats/departments");
+      const deptData = await deptRes.json();
+
+      // 2. Phiên audit — có thể lọc theo ngày + bộ phận
+      let sessUrl = API + "/scan/audit-sessions";
+      const params = [];
+      if (dateFrom) params.push(`from=${dateFrom}`);
+      if (dateTo)   params.push(`to=${dateTo}`);
+      if (deptId)   params.push(`dept=${deptId}`);
+      if (params.length) sessUrl += '?' + params.join('&');
+
+      const sessRes  = await fetch(sessUrl);
+      const sessData = await sessRes.json();
+
+      // 3. Tổng quan
+      const totalDev   = deptData.reduce((s, d) => s + (d.total_devices   || 0), 0);
+      const totalScan  = deptData.reduce((s, d) => s + (d.scanned_devices || 0), 0);
+      const totalSess  = Array.isArray(sessData) ? sessData.length : 0;
+      const activeSess = Array.isArray(sessData) ? sessData.filter(s => !s.ended_at).length : 0;
+
+      document.getElementById('as-total').textContent     = totalDev;
+      document.getElementById('as-scanned').textContent   = totalScan;
+      document.getElementById('as-remaining').textContent = totalDev - totalScan;
+      document.getElementById('as-sessions').textContent  = totalSess;
+
+      const activeEl = document.getElementById('as-active');
+      if (activeSess > 0) {
+        document.getElementById('as-active-count').textContent = activeSess;
+        activeEl.classList.remove('hidden');
+      } else { activeEl.classList.add('hidden'); }
+
+      // 4. Progress bars
+      const prog = document.getElementById('audit-dept-progress');
+      if (!deptData.length) {
+        prog.innerHTML = '<p class="text-gray-400 text-sm">Chưa có dữ liệu</p>';
+      } else {
+        prog.innerHTML = deptData.map(d => {
+          const total   = d.total_devices   || 0;
+          const scanned = d.scanned_devices || 0;
+          const pct     = total > 0 ? Math.round(scanned * 100 / total) : 0;
+          const color   = pct >= 80 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-400' : 'bg-red-400';
+          const textCol = pct >= 80 ? 'text-green-600' : pct >= 40 ? 'text-yellow-600' : 'text-red-500';
+          return `<div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-medium text-gray-700 text-sm">${d.department_name}</span>
+              <span class="text-sm text-gray-500">
+                <span class="font-semibold text-gray-700">${scanned}</span> / ${total} thiết bị
+                <span class="ml-2 font-bold ${textCol}">${pct}%</span>
+              </span>
             </div>
-          <% }); %>
-        </div>
-      </div>
-    </section>
-
-    <!-- Users -->
-    <section id="users" class="tab hidden">
-      <h2 class="text-2xl font-bold mb-4">👤 Quản lý User</h2>
-      <form id="userForm" class="bg-white p-6 rounded-xl shadow space-y-4 max-w-md">
-        <input type="text" id="newUser" placeholder="Tên đăng nhập" class="w-full p-3 border rounded-lg">
-        <input type="password" id="newPass" placeholder="Mật khẩu" class="w-full p-3 border rounded-lg">
-        <input type="text" id="fullName" placeholder="Họ tên" class="w-full p-3 border rounded-lg">
-        <select id="department" class="w-full p-3 border rounded-lg">
-          <% departments.forEach(dep => { %>
-            <option value="<%= dep.id %>"><%= dep.name %></option>
-          <% }); %>
-        </select>
-        <select id="role" class="w-full p-3 border rounded-lg">
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
-        <button type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-lg">+ Tạo User</button>
-      </form>
-      <div class="mt-6 bg-white p-4 rounded-xl shadow">
-        <h3 class="font-semibold mb-2">Danh sách User</h3>
-        <table class="w-full border text-sm">
-          <thead>
-            <tr class="bg-gray-200">
-              <th class="p-2 border">ID</th>
-              <th class="p-2 border">Tên đăng nhập</th>
-              <th class="p-2 border">Họ tên</th>
-              <th class="p-2 border">Bộ phận</th>
-              <th class="p-2 border">Role</th>
-              <th class="p-2 border">Hành động</th>
-            </tr>
-          </thead>
-          <tbody id="userTable"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Modal Edit User -->
-    <div id="editUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
-      <div class="bg-white p-6 rounded-xl w-96">
-        <h3 class="text-xl font-bold mb-4">✏️ Chỉnh sửa User</h3>
-        <input type="hidden" id="editUserId">
-        <input type="text" id="editFullName" placeholder="Họ tên" class="w-full p-3 border rounded-lg mb-3">
-        <input type="password" id="editPass" placeholder="Mật khẩu mới (để trống nếu không đổi)" class="w-full p-3 border rounded-lg mb-3">
-        <select id="editDepartment" class="w-full p-3 border rounded-lg mb-3">
-          <% departments.forEach(dep => { %>
-            <option value="<%= dep.id %>"><%= dep.name %></option>
-          <% }); %>
-        </select>
-        <select id="editRole" class="w-full p-3 border rounded-lg mb-4">
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
-        <div class="flex justify-end gap-2">
-          <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-400 text-white rounded-lg">Hủy</button>
-          <button onclick="saveUserEdit()" class="px-4 py-2 bg-blue-600 text-white rounded-lg">💾 Lưu</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Devices -->
-    <section id="devices" class="tab hidden">
-      <h2 class="text-2xl font-bold mb-4">💻 Quản lý Thiết bị</h2>
-      <div class="bg-white p-6 rounded-xl shadow space-y-4">
-        <button onclick="window.location.href='<%= apiUrl %>/devices/export'" class="bg-blue-500 text-white px-4 py-2 rounded">⬇️ Tải danh sách thiết bị</button>
-        <button onclick="downloadDeviceTemplate()" class="px-6 py-2 bg-green-600 text-white rounded-lg">📥 Tải Excel mẫu</button>
-        <div class="mt-4 flex gap-2">
-          <input type="file" id="excelFile" accept=".xlsx,.xls" class="border p-2 rounded">
-          <button onclick="uploadExcel()" class="px-6 py-2 bg-purple-600 text-white rounded-lg">📤 Upload Excel</button>
-          <button id="deleteAllDevicesBtn" class="px-6 py-2 bg-red-500 text-white rounded-lg">🗑️ Xóa tất cả thiết bị</button>
-        </div>
-        <table class="w-full mt-4 border text-sm">
-          <thead>
-            <tr class="bg-gray-200">
-              <th class="p-2 border">ID</th>
-              <th class="p-2 border">Tên Thiết Bị</th>
-              <th class="p-2 border">Loại thiết bị</th>
-              <th class="p-2 border">Bộ phận</th>
-              <th class="p-2 border">Trạng thái</th>
-              <th class="p-2 border">Hành động</th>
-            </tr>
-          </thead>
-          <tbody id="deviceTable"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Reports -->
-    <section id="reports" class="tab hidden">
-      <h2 class="text-2xl font-bold mb-4">📋 Báo cáo</h2>
-      <div class="bg-white p-6 rounded-xl shadow">
-        <p class="mb-4">Danh sách thiết bị đã quét:</p>
-        <ul id="scannedList" class="space-y-2 text-green-700 font-medium"></ul>
-        <div class="mt-6 text-center">
-          <button onclick="exportReport()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg">📤 Xuất báo cáo Excel</button>
-          <button onclick="clearReports()" class="px-6 py-3 bg-red-600 text-white rounded-lg">🗑️ Xóa tất cả báo cáo</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script>
-    const API = window.location.origin + "/api";
-    const currentUser = <%- JSON.stringify(user) %>;
-
-    // Kiểm tra quyền admin
-    if (!currentUser.id) {
-      window.location.href = "/login";
-    } else if (currentUser.role !== "admin") {
-      alert("🚫 Bạn không có quyền Admin!");
-      window.location.href = "/index";
-    }
-
-    // 🔹 Show tab
-    function showTab(tabId) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
-      document.getElementById(tabId).classList.remove('hidden');
-      if(tabId === "dashboard") loadCharts();
-      if(tabId === "users") fetchUsers();
-      if(tabId === "devices") fetchDevices();
-      if(tabId === "reports") fetchReports();
-    }
-
-    function logout(){ 
-      window.location.href = "/logout"; 
-    }
-
-    // === USERS ===
-    async function fetchUsers(){
-      let res = await fetch(API+"/users");
-      let data = await res.json();
-      let tbody = document.getElementById("userTable");
-      tbody.innerHTML = "";
-      data.forEach(u=>{
-        let tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td class="border p-2">${u.id}</td>
-          <td class="border p-2">${u.username}</td>
-          <td class="border p-2">${u.full_name}</td>
-          <td class="border p-2">${u.department_name || u.department_id}</td>
-          <td class="border p-2">${u.role}</td>
-          <td class="border p-2">
-            <button onclick='openEditModal(${JSON.stringify(u)})' class="px-3 py-1 bg-yellow-500 text-white rounded-lg">✏️ Edit</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    document.getElementById("userForm").addEventListener("submit", async e=>{
-      e.preventDefault();
-      let body = {
-        username: document.getElementById("newUser").value,
-        password: document.getElementById("newPass").value,
-        full_name: document.getElementById("fullName").value,
-        department_id: document.getElementById("department").value,
-        role: document.getElementById("role").value
-      };
-      let res = await fetch(API+"/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      let data = await res.json();
-      alert(data.message);
-      fetchUsers();
-      e.target.reset();
-    });
-
-    function openEditModal(user){
-      document.getElementById("editUserId").value = user.id;
-      document.getElementById("editFullName").value = user.full_name;
-      document.getElementById("editDepartment").value = user.department_id;
-      document.getElementById("editRole").value = user.role;
-      document.getElementById("editPass").value = "";
-      document.getElementById("editUserModal").classList.remove("hidden");
-    }
-
-    function closeEditModal(){ 
-      document.getElementById("editUserModal").classList.add("hidden"); 
-    }
-
-    async function saveUserEdit(){
-      let id = document.getElementById("editUserId").value;
-      let body = {
-        full_name: document.getElementById("editFullName").value,
-        department_id: document.getElementById("editDepartment").value,
-        role: document.getElementById("editRole").value
-      };
-      
-      const password = document.getElementById("editPass").value;
-      if (password) body.password = password;
-
-      let res = await fetch(API+"/users/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      let data = await res.json();
-      alert(data.message);
-      closeEditModal();
-      fetchUsers();
-    }
-
-    // === DEVICES ===
-    async function fetchDevices(){
-      try {
-        let res = await fetch(API + "/devices");
-        let devices = await res.json();
-
-        let tbody = document.getElementById("deviceTable");
-        tbody.innerHTML = "";
-
-        devices.forEach(dev => {
-          let tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="border p-2">${dev.id}</td>
-            <td class="border p-2">${dev.name}</td>
-            <td class="border p-2">${dev.device_type_name || "-"}</td>
-            <td class="border p-2">${dev.department_name || "-"}</td>
-            <td class="border p-2 ${dev.status === 'Đã quét' ? 'text-green-600' : 'text-red-600'}">
-              ${dev.status}
-            </td>
-            <td class="border p-2">
-              <button class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                      onclick="deleteDevice(${dev.id})">Xóa</button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } catch (err) {
-        console.error("❌ Lỗi tải thiết bị:", err);
+            <div class="w-full bg-gray-100 rounded-full h-3">
+              <div class="progress-bar ${color} h-3 rounded-full" style="width:0%" data-target="${pct}%"></div>
+            </div>
+            ${total - scanned > 0 ? `<div class="text-xs text-gray-400 mt-0.5">Còn ${total - scanned} thiết bị chưa audit</div>` : ''}
+          </div>`;
+        }).join('');
+        setTimeout(() => {
+          document.querySelectorAll('.progress-bar[data-target]').forEach(bar => {
+            bar.style.width = bar.dataset.target;
+          });
+        }, 80);
       }
-    }
 
-    function downloadDeviceTemplate(){
-      let ws_data = [["Name","QR_Code","Department","DeviceType","Location"]];
-      ws_data.push(["Laptop Dell","QR001","Phòng IT","Laptop","Tầng 1"]);
-      ws_data.push(["Máy in HP","QR002","Phòng Hành Chính","Máy in","Tầng 2"]);
-      let ws = XLSX.utils.aoa_to_sheet(ws_data);
-      let wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,"Devices");
-      XLSX.writeFile(wb,"Device_Template.xlsx");
-    }
+      // 5. Bảng phiên audit
+      const label = params.length ? `(đã lọc: ${totalSess} phiên)` : `(${totalSess} phiên gần nhất)`;
+      document.getElementById('session-filter-label').textContent = label;
 
-    async function uploadExcel(){
-      let fileInput=document.getElementById("excelFile");
-      if(!fileInput.files.length){ alert("⚠️ Vui lòng chọn file Excel trước!"); return; }
-      let formData=new FormData();
-      formData.append("file",fileInput.files[0]);
-      let res=await fetch(API+"/devices/upload",{method:"POST",body:formData});
-      let data=await res.json();
-      alert(data.message);
-      fetchDevices();
-    }
+      const tbody = document.getElementById('audit-sessions-table');
+      if (!Array.isArray(sessData) || !sessData.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-400 text-sm">Không có phiên audit nào</td></tr>';
+      } else {
+        tbody.innerHTML = sessData.map(s => {
+          const started = new Date(s.started_at || s.created_at);
+          const ended   = s.ended_at ? new Date(s.ended_at) : null;
+          const mins    = ended ? Math.round((ended - started) / 60000) : null;
+          const dur     = mins === null ? '—' : mins < 60 ? `${mins} phút` : `${Math.floor(mins/60)}h ${mins%60}m`;
+          const status  = !s.ended_at
+            ? `<span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block"></span>Đang chạy</span>`
+            : `<span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">Hoàn tất</span>`;
+          return `<tr class="hover:bg-gray-50 border-b transition-colors">
+            <td class="py-2.5 pr-3 font-medium text-gray-700 text-sm">${s.auditor_name || '—'}</td>
+            <td class="py-2.5 pr-3 text-gray-600 text-sm">${s.dept_name || '—'}</td>
+            <td class="py-2.5 pr-3 text-gray-500 text-xs">${started.toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+            <td class="py-2.5 pr-3 text-gray-500 text-xs">${dur}</td>
+            <td class="py-2.5 pr-3 text-center font-semibold text-indigo-600">${s.total_scanned ?? '—'}</td>
+            <td class="py-2.5 pr-3 text-center">${status}</td>
+            <td class="py-2.5 text-center">
+              <div class="flex gap-1 justify-center flex-wrap">
+                <button onclick="showAuditCompare(${s.id}, '${s.dept_name || ''}')"
+                  class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-xs hover:bg-indigo-200 font-medium">
+                  📊 So sánh
+                </button>
+                ${!s.ended_at
+                  ? `<button onclick="forceStopAudit(${s.id})"
+                      class="bg-orange-100 text-orange-600 px-3 py-1 rounded-lg text-xs hover:bg-orange-200 font-medium">
+                      ⏹ Dừng
+                    </button>`
+                  : `<button onclick="deleteAuditSession(${s.id})"
+                      class="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-xs hover:bg-red-200 font-medium">
+                      🗑️ Xóa
+                    </button>`
+                }
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      }
 
-    async function deleteDevice(id) {
-      if (!confirm('Bạn có chắc muốn xóa thiết bị này?')) return;
-      const res = await fetch(`${API}/devices/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('loadAudit error', err);
+      document.getElementById('audit-dept-progress').innerHTML =
+        '<p class="text-red-400 text-sm">Lỗi tải dữ liệu</p>';
+    }
+  }
+
+  async function forceStopAudit(id) {
+    if (!confirm("Dừng phiên audit này?\nPhiên sẽ được đánh dấu hoàn tất.")) return;
+    try {
+      const res  = await fetch(API + "/scan/force-stop/" + id, { method: "POST" });
       const data = await res.json();
-      alert(data.message);
-      fetchDevices();
+      if (data.success) {
+        loadAudit(
+          document.getElementById('filter-date-from').value || null,
+          document.getElementById('filter-date-to').value   || null,
+          document.getElementById('filter-dept').value      || null
+        );
+      } else {
+        alert("❌ " + (data.message || "Lỗi dừng phiên"));
+      }
+    } catch (err) {
+      alert("❌ Lỗi kết nối server");
     }
+  }
 
-    document.getElementById('deleteAllDevicesBtn').addEventListener('click', async () => {
-      if (!confirm('Bạn có chắc muốn xóa tất cả thiết bị?')) return;
-      const res = await fetch(`${API}/devices`, { method: 'DELETE' });
+  async function deleteAuditSession(id) {
+    if (!confirm("Xóa phiên audit này?\nLịch sử scan vẫn được giữ lại.")) return;
+    try {
+      const res  = await fetch(API + "/scan/audit-session/" + id, { method: "DELETE" });
       const data = await res.json();
-      alert(data.message);
-      fetchDevices();
+      if (data.success) {
+        loadAudit(
+          document.getElementById('filter-date-from').value || null,
+          document.getElementById('filter-date-to').value   || null,
+          document.getElementById('filter-dept').value      || null
+        );
+      } else {
+        alert("❌ " + (data.message || "Lỗi xóa phiên audit"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Lỗi kết nối server");
+    }
+  }
+
+  function applyAuditFilter() {
+    const from  = document.getElementById('filter-date-from').value;
+    const to    = document.getElementById('filter-date-to').value;
+    const dept  = document.getElementById('filter-dept').value;
+    loadAudit(from || null, to || null, dept || null);
+  }
+
+  function resetAuditFilter() {
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value   = '';
+    document.getElementById('filter-dept').value      = '';
+    loadAudit();
+  }
+
+  // So sánh chi tiết 1 phiên: thiết bị đã audit vs chưa audit
+  async function showAuditCompare(sessionId, deptName) {
+    try {
+      const res  = await fetch(API + `/scan/audit-compare/${sessionId}`);
+      const data = await res.json();
+
+      if (!Array.isArray(data)) { alert('Lỗi tải dữ liệu so sánh'); return; }
+
+      currentCompareData = data;
+
+      const audited  = data.filter(d => d.audited);
+      const missing  = data.filter(d => !d.audited);
+
+      document.getElementById('audit-compare-title').textContent  = `📊 So sánh: ${deptName}`;
+      document.getElementById('cmp-audited').textContent = audited.length;
+      document.getElementById('cmp-missing').textContent = missing.length;
+      document.getElementById('cmp-total').textContent   = data.length;
+
+      document.getElementById('audit-compare-table').innerHTML = data.map(d => `
+        <tr class="border-b hover:bg-gray-50 ${d.audited ? '' : 'bg-red-50'}">
+          <td class="py-2 pr-3 font-medium text-sm">${d.device_name}</td>
+          <td class="py-2 pr-3 text-gray-500 text-xs">${d.qr_code}</td>
+          <td class="py-2 pr-3 text-gray-500 text-xs">${d.location || '—'}</td>
+          <td class="py-2 pr-3 text-gray-500 text-xs">${d.scanned_by || '—'}</td>
+          <td class="py-2 pr-3 text-gray-500 text-xs">${d.scanned_at ? new Date(d.scanned_at).toLocaleString('vi-VN') : '—'}</td>
+          <td class="py-2 text-center">
+            ${d.audited
+              ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium">✅ Đã audit</span>'
+              : '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium">❌ Chưa audit</span>'}
+          </td>
+        </tr>`).join('');
+
+      document.getElementById('audit-compare-box').classList.remove('hidden');
+      document.getElementById('audit-compare-box').scrollIntoView({ behavior: 'smooth' });
+
+    } catch (err) {
+      console.error('showAuditCompare error', err);
+      alert('Lỗi tải dữ liệu so sánh');
+    }
+  }
+
+  function exportAuditCompare() {
+    if (!currentCompareData.length) { alert('Không có dữ liệu'); return; }
+    const rows = [['Tên thiết bị','QR Code','Vị trí','Người audit','Thời gian','Trạng thái']];
+    currentCompareData.forEach(d => rows.push([
+      d.device_name, d.qr_code, d.location || '',
+      d.scanned_by || '', d.scanned_at || '',
+      d.audited ? 'Đã audit' : 'Chưa audit'
+    ]));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit');
+    XLSX.writeFile(wb, `Audit_${document.getElementById('audit-compare-title').textContent.replace('📊 So sánh: ','')}.xlsx`);
+  }
+
+  // ── Users ──────────────────────────────────────────────────
+  async function fetchUsers() {
+    let res  = await fetch(API + "/users");
+    let data = await res.json();
+    let tbody = document.getElementById("userTable");
+    tbody.innerHTML = "";
+    data.forEach(u => {
+      const roleColor = u.role === 'admin' ? 'bg-red-100 text-red-700' : u.role === 'auditor' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600';
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="border p-2">${u.id}</td>
+        <td class="border p-2">${u.username}</td>
+        <td class="border p-2">${u.full_name}</td>
+        <td class="border p-2">${u.department_name || u.department_id || '—'}</td>
+        <td class="border p-2"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${roleColor}">${u.role}</span></td>
+        <td class="border p-2 space-x-1">
+          <button onclick='openEditModal(${JSON.stringify(u)})' class="px-3 py-1 bg-yellow-500 text-white rounded-lg text-xs">✏️ Edit</button>
+          <button onclick="deleteUser(${u.id})" class="px-3 py-1 bg-red-500 text-white rounded-lg text-xs">🗑️ Xóa</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function deleteUser(id) {
+    if (!confirm("Bạn có chắc muốn xóa tài khoản này?")) return;
+    const res    = await fetch(`/api/users/${id}`, { method: "DELETE" });
+    const result = await res.json();
+    alert(result.success ? "Xóa thành công" : result.message);
+    if (result.success) fetchUsers();
+  }
+
+  document.getElementById("userForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    let body = {
+      username:      document.getElementById("newUser").value,
+      password:      document.getElementById("newPass").value,
+      full_name:     document.getElementById("fullName").value,
+      department_id: document.getElementById("department").value,
+      role:          document.getElementById("role").value
+    };
+    let res  = await fetch(API + "/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let data = await res.json();
+    alert(data.message);
+    fetchUsers();
+    e.target.reset();
+  });
+
+  function openEditModal(user) {
+    document.getElementById("editUserId").value      = user.id;
+    document.getElementById("editFullName").value    = user.full_name;
+    document.getElementById("editDepartment").value  = user.department_id;
+    document.getElementById("editRole").value        = user.role;
+    document.getElementById("editPass").value        = "";
+    document.getElementById("editUserModal").classList.remove("hidden");
+  }
+  function closeEditModal() { document.getElementById("editUserModal").classList.add("hidden"); }
+
+  async function saveUserEdit() {
+    let id   = document.getElementById("editUserId").value;
+    let body = {
+      full_name:     document.getElementById("editFullName").value,
+      department_id: document.getElementById("editDepartment").value,
+      role:          document.getElementById("editRole").value
+    };
+    const password = document.getElementById("editPass").value;
+    if (password) body.password = password;
+    let res  = await fetch(API + "/users/" + id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let data = await res.json();
+    alert(data.message);
+    closeEditModal();
+    fetchUsers();
+  }
+
+  // ── Devices ────────────────────────────────────────────────
+  async function fetchDevices() {
+    let res     = await fetch(API + "/devices");
+    let devices = await res.json();
+    let tbody   = document.getElementById("deviceTable");
+    tbody.innerHTML = "";
+    devices.forEach(dev => {
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="border p-2">${dev.id}</td>
+        <td class="border p-2">${dev.name}</td>
+        <td class="border p-2">${dev.device_type_name || "-"}</td>
+        <td class="border p-2">${dev.department_name || "-"}</td>
+        <td class="border p-2 ${dev.status === 'Đã quét' ? 'text-green-600' : 'text-red-600'}">${dev.status}</td>
+        <td class="border p-2">
+          <button class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs" onclick="deleteDevice(${dev.id})">Xóa</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function downloadDeviceTemplate() {
+    let ws_data = [["Name","QR_Code","Department","DeviceType","Location"]];
+    ws_data.push(["Laptop Dell","QR001","Phòng IT","Laptop","Tầng 1"]);
+    ws_data.push(["Máy in HP","QR002","Phòng Hành Chính","Máy in","Tầng 2"]);
+    let ws = XLSX.utils.aoa_to_sheet(ws_data);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Devices");
+    XLSX.writeFile(wb, "Device_Template.xlsx");
+  }
+
+  async function uploadExcel() {
+    let fileInput = document.getElementById("excelFile");
+    if (!fileInput.files.length) { alert("⚠️ Vui lòng chọn file Excel trước!"); return; }
+    let formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    let res  = await fetch(API + "/devices/upload", { method: "POST", body: formData });
+    let data = await res.json();
+    alert(data.message);
+    fetchDevices();
+  }
+
+  async function deleteDevice(id) {
+    if (!confirm('Bạn có chắc muốn xóa thiết bị này?')) return;
+    const res  = await fetch(`${API}/devices/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    alert(data.message);
+    fetchDevices();
+  }
+
+  document.getElementById('deleteAllDevicesBtn').addEventListener('click', async () => {
+    if (!confirm('Bạn có chắc muốn xóa tất cả thiết bị?')) return;
+    const res  = await fetch(`${API}/devices`, { method: 'DELETE' });
+    const data = await res.json();
+    alert(data.message);
+    fetchDevices();
+  });
+
+  // ── Dashboard charts ───────────────────────────────────────
+  let overallChart, deptChart, lastDeptDevices = [], lastDeptName = "";
+
+  async function loadCharts() {
+    let stats        = await fetch(API + "/stats/departments").then(r => r.json());
+    let totalDevices = stats.reduce((sum, s) => sum + s.total_devices, 0);
+    let totalScanned = stats.reduce((sum, s) => sum + s.scanned_devices, 0);
+
+    let ctx1 = document.getElementById("overallChart").getContext("2d");
+    if (overallChart) overallChart.destroy();
+    overallChart = new Chart(ctx1, {
+      type: "doughnut",
+      data: { labels: ["Đã quét","Chưa quét"], datasets: [{ data: [totalScanned, Math.max(0, totalDevices-totalScanned)], backgroundColor: ["#22c55e","#ef4444"] }] },
+      options: { plugins: { legend: { position: "bottom" } } }
     });
 
-    // === DASHBOARD ===
-    let overallChart, deptChart, lastDeptDevices=[], lastDeptName="";
-
-    async function loadCharts(){
-      let stats=await fetch(API+"/stats/departments").then(r=>r.json());
-      let totalDevices=stats.reduce((sum,s)=>sum+s.total_devices,0);
-      let totalScanned=stats.reduce((sum,s)=>sum+s.scanned_devices,0);
-      let totalPending=Math.max(0,totalDevices-totalScanned);
-      
-      let ctx1=document.getElementById("overallChart").getContext("2d");
-      if(overallChart) overallChart.destroy();
-      overallChart=new Chart(ctx1,{
-        type:"doughnut",
-        data:{
-          labels:["Đã quét","Chưa quét"],
-          datasets:[{
-            data:[totalScanned,totalPending],
-            backgroundColor:["#22c55e","#ef4444"]
-          }]
-        },
-        options:{
-          plugins:{legend:{position:"bottom"}}
-        }
-      });
-      
-      let ctx2=document.getElementById("deptChart").getContext("2d");
-      if(deptChart) deptChart.destroy();
-      deptChart=new Chart(ctx2,{
-        type:"bar",
-        data:{
-          labels:stats.map(s=>s.department_name),
-          datasets:[
-            {label:"Đã quét",data:stats.map(s=>s.scanned_devices),backgroundColor:"#22c55e"},
-            {label:"Chưa quét",data:stats.map(s=>s.pending_devices),backgroundColor:"#ef4444"}
-          ]
-        },
-        options:{
-          responsive:true,
-          scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},
-          onClick:async(evt,item)=>{
-            if(item.length>0){
-              let idx=item[0].index;
-              let dept=stats[idx];
-              viewDept(dept.department_id,dept.department_name);
-            }
+    let ctx2 = document.getElementById("deptChart").getContext("2d");
+    if (deptChart) deptChart.destroy();
+    deptChart = new Chart(ctx2, {
+      type: "bar",
+      data: {
+        labels: stats.map(s => s.department_name),
+        datasets: [
+          { label: "Đã quét",   data: stats.map(s => s.scanned_devices), backgroundColor: "#22c55e" },
+          { label: "Chưa quét", data: stats.map(s => s.pending_devices),  backgroundColor: "#ef4444" }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+        onClick: async (evt, item) => {
+          if (item.length > 0) {
+            let dept = stats[item[0].index];
+            viewDept(dept.department_id, dept.department_name);
           }
         }
-      });
-    }
-
-    async function viewDept(id,name){
-      let data=await fetch(API+"/departments/"+id+"/devices").then(r=>r.json());
-      lastDeptDevices=data; lastDeptName=name;
-      document.getElementById("deptName").textContent=name;
-      document.getElementById("deptDevices").classList.remove("hidden");
-      let tbody=document.getElementById("deptDeviceTable");
-      tbody.innerHTML="";
-      data.forEach(d=>{
-        let tr=document.createElement("tr");
-        tr.innerHTML=`<td class="border p-2">${d.qr_code}</td><td class="border p-2">${d.name}</td><td class="border p-2">${d.location}</td><td class="border p-2 ${d.status==='Đã quét'?'text-green-600':'text-red-600'}">${d.status||"Chưa quét"}</td>`;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function exportDept(){
-      if(lastDeptDevices.length===0){ alert("⚠️ Chưa có dữ liệu để xuất!"); return; }
-      let ws=XLSX.utils.json_to_sheet(lastDeptDevices);
-      let wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,lastDeptName);
-      XLSX.writeFile(wb,`Dept_${lastDeptName}.xlsx`);
-    }
-
-    // === REPORTS ===
-    async function fetchReports(){
-      try {
-        let res = await fetch(API + "/scans");
-        let data = await res.json();
-
-        let scans = Array.isArray(data) ? data : data.scans;
-
-        if (!Array.isArray(scans)) {
-          console.error("API trả về không đúng:", data);
-          alert("❌ Không thể tải báo cáo!");
-          return;
-        }
-
-        let list = document.getElementById("scannedList");
-        list.innerHTML = "";
-
-        scans.forEach(s => {
-          let li = document.createElement("li");
-          li.textContent = `${s.device_name} (${s.qr_code}) - ${s.user_name} @ ${s.scanned_at}`;
-          list.appendChild(li);
-        });
-      } catch (err) {
-        console.error("❌ Lỗi tải báo cáo:", err);
       }
-    }
+    });
+  }
 
-    async function exportReport(){
-      let res = await fetch(API + "/scans");
-      let data = await res.json();
-      let scans = Array.isArray(data) ? data : data.scans;
+  async function viewDept(id, name) {
+    let data = await fetch(API + "/departments/" + id + "/devices").then(r => r.json());
+    lastDeptDevices = data; lastDeptName = name;
+    document.getElementById("deptName").textContent = name;
+    document.getElementById("deptDevices").classList.remove("hidden");
+    let tbody = document.getElementById("deptDeviceTable");
+    tbody.innerHTML = "";
+    data.forEach(d => {
+      let tr = document.createElement("tr");
+      tr.innerHTML = `<td class="border p-2">${d.qr_code}</td><td class="border p-2">${d.name}</td><td class="border p-2">${d.location}</td><td class="border p-2 ${d.status==='Đã quét'?'text-green-600':'text-red-600'}">${d.status||"Chưa quét"}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
 
-      if (!Array.isArray(scans) || scans.length === 0) {
-        alert("⚠️ Chưa có thiết bị nào được quét!");
-        return;
-      }
+  function exportDept() {
+    if (!lastDeptDevices.length) { alert("⚠️ Chưa có dữ liệu để xuất!"); return; }
+    let ws = XLSX.utils.json_to_sheet(lastDeptDevices);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, lastDeptName);
+    XLSX.writeFile(wb, `Dept_${lastDeptName}.xlsx`);
+  }
 
-      let ws_data=[["Tên Thiết Bị","QR Code","Người Quét","Thời Gian"]];
-      scans.forEach(s => ws_data.push([s.device_name, s.qr_code, s.user_name, s.scanned_at]));
+  // ── Reports ────────────────────────────────────────────────
+  async function fetchReports() {
+    let res   = await fetch(API + "/scans");
+    let scans = await res.json();
+    const list = document.getElementById("scannedList");
+    list.innerHTML = "";
+    if (!Array.isArray(scans)) return;
+    scans.forEach(s => {
+      let li = document.createElement("li");
+      li.className = s.status?.includes("Sai") ? "text-red-600 font-bold" : "text-green-600";
+      li.innerHTML = `<b>${s.device_name}</b> (${s.qr_code})<br>Thuộc: ${s.device_department}<br>Quét tại: ${s.scan_department}<br>${s.status} - ${s.user_name} @ ${s.scanned_at}`;
+      list.appendChild(li);
+    });
+  }
 
-      let ws=XLSX.utils.aoa_to_sheet(ws_data);
-      let wb=XLSX.utils.book_new(); 
-      XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
-      XLSX.writeFile(wb, "BaoCaoThietBiDaQuet.xlsx");
-    }
+  async function exportReport() {
+    let res   = await fetch(API + "/scans");
+    let data  = await res.json();
+    let scans = Array.isArray(data) ? data : data.scans;
+    if (!Array.isArray(scans) || !scans.length) { alert("⚠️ Chưa có thiết bị nào được quét!"); return; }
+    let ws_data = [["Tên Thiết Bị","QR Code","Người Quét","Thời Gian"]];
+    scans.forEach(s => ws_data.push([s.device_name, s.qr_code, s.user_name, s.scanned_at]));
+    let ws = XLSX.utils.aoa_to_sheet(ws_data);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
+    XLSX.writeFile(wb, "BaoCaoThietBiDaQuet.xlsx");
+  }
 
-    async function clearReports() {
-      if (!confirm("Bạn có chắc muốn xóa toàn bộ báo cáo?")) return;
+  async function clearReports() {
+    if (!confirm("Bạn có chắc muốn xóa toàn bộ báo cáo?")) return;
+    const res  = await fetch(API + "/scans", { method: "DELETE" });
+    const data = await res.json();
+    alert(data.success ? "✅ " + data.message : "❌ Xóa thất bại: " + data.message);
+    if (data.success) fetchReports();
+  }
 
-      try {
-        const res = await fetch(API + "/scans", { method: "DELETE" });
-        const data = await res.json();
-        
-        if (data.success) {
-          alert("✅ " + data.message);
-          fetchReports();
-        } else {
-          alert("❌ Xóa thất bại: " + data.message);
-        }
-      } catch (err) {
-        console.error("❌ Fetch error:", err);
-        alert("Có lỗi khi kết nối server!");
-      }
-    }
+  // ── Departments ────────────────────────────────────────────
+  async function deleteDepartment(id, btn) {
+    if (!confirm("Bạn có chắc muốn xóa bộ phận này?")) return;
+    const res  = await fetch(`${API}/departments/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.success) { btn.parentElement.remove(); }
+    else { alert("❌ " + data.message); }
+  }
 
-    // === DEPARTMENT MANAGEMENT ===
-    async function deleteDepartment(id, btn) {
-      if (!confirm("Bạn có chắc muốn xóa bộ phận này?")) return;
+  // ── Device types ───────────────────────────────────────────
+  async function fetchDeviceTypes() {
+    let res  = await fetch(API + "/device-types");
+    let data = await res.json();
+    let tbody = document.getElementById("deviceTypeTable");
+    tbody.innerHTML = "";
+    data.forEach(t => {
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="border p-2">${t.id}</td>
+        <td class="border p-2"><input id="type_${t.id}" value="${t.name}" class="border p-1 rounded w-full"></td>
+        <td class="border p-2 space-x-2">
+          <button onclick="updateDeviceType(${t.id})" class="bg-yellow-500 text-white px-2 py-1 rounded text-xs">Sửa</button>
+          <button onclick="deleteDeviceType(${t.id})" class="bg-red-500 text-white px-2 py-1 rounded text-xs">Xóa</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
 
-      try {
-        const res = await fetch(`${API}/departments/${id}`, { method: "DELETE" });
-        const data = await res.json();
+  async function addDeviceType() {
+    let name = document.getElementById("newDeviceType").value;
+    if (!name) { alert("Nhập tên loại thiết bị"); return; }
+    let res  = await fetch(API + "/device-types", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    let data = await res.json();
+    alert(data.message);
+    document.getElementById("newDeviceType").value = "";
+    fetchDeviceTypes();
+  }
 
-        if (data.success) {
-          alert("✅ " + data.message);
-          btn.parentElement.remove();
-        } else {
-          alert("❌ " + data.message);
-        }
-      } catch (err) {
-        console.error("❌ Lỗi xóa department:", err);
-        alert("Có lỗi khi xóa bộ phận!");
-      }
-    }
+  async function updateDeviceType(id) {
+    let name = document.getElementById("type_" + id).value;
+    let res  = await fetch(API + "/device-types/" + id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    let data = await res.json();
+    alert(data.message);
+  }
 
-    // === INIT ===
-    showTab("dashboard");
-  </script>
+  async function deleteDeviceType(id) {
+    if (!confirm("Xóa loại thiết bị?")) return;
+    let res  = await fetch(API + "/device-types/" + id, { method: "DELETE" });
+    let data = await res.json();
+    alert(data.message);
+    fetchDeviceTypes();
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  showTab("dashboard");
+</script>
 </body>
 </html>

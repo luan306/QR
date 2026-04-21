@@ -1,0 +1,87 @@
+CREATE DATABASE inventory;
+USE inventory;
+
+-- Bảng user
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100),
+    role VARCHAR(20) DEFAULT 'user', -- admin / user
+    department_id INT
+);
+
+-- Bảng bộ phận
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL
+);
+
+-- Bảng thiết bị
+CREATE TABLE devices (
+    id SERIAL PRIMARY KEY,
+    qr_code VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(100),
+    location VARCHAR(100),
+    department_id INT REFERENCES departments(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Bảng lịch sử quét
+CREATE TABLE scans (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id),
+    device_id INT REFERENCES devices(id),
+    scanned_at TIMESTAMP DEFAULT NOW()
+);
+-- Thêm bộ phận
+INSERT INTO departments (name) VALUES ('IT'), ('Văn phòng');
+
+-- Thêm user admin (mật khẩu để tạm plain text, sau này hash bằng API)
+INSERT INTO users (username, password, full_name, role, department_id)
+VALUES ('admin', 'admin', 'Quản trị viên', 'admin', 1);
+
+-- Thêm vài thiết bị
+INSERT INTO devices (qr_code, name, location, department_id)
+VALUES 
+('6HHP6Z3', 'Laptop Dell XPS 13', 'Phòng IT-103', 3),
+('PRN23456', 'Máy in Canon LBP2900', 'Phòng văn phòng', 2);
+
+SELECT * FROM device_types;
+SELECT * FROM departments;
+SELECT * FROM devices;
+CREATE TABLE device_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL
+);
+
+INSERT INTO device_types (name) VALUES
+('Laptop Dell'),
+('PDA'),
+('ZD621"');
+
+
+CREATE TABLE departments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL
+);
+
+
+INSERT INTO departments (name) VALUES
+('IT'),
+('Văn phòng'),
+('Kế toán');
+
+
+ALTER TABLE devices 
+ADD COLUMN device_type_id INT REFERENCES device_types(id);
+
+ALTER TABLE devices ADD COLUMN device_type_id INT;
+ALTER TABLE devices ADD CONSTRAINT fk_device_type FOREIGN KEY (device_type_id) REFERENCES device_types(id);
+
+
+SELECT d.id, d.name, d.qr_code, d.device_type_id, dt.name AS device_type_name
+FROM devices d
+LEFT JOIN device_types dt ON d.device_type_id = dt.id
+LIMIT 10;
+
