@@ -1,0 +1,98 @@
+{
+  "checking": "Checking...",
+  "login": "Login",
+  "username": "Username",
+  "password": "Password",
+  "login_error": "Login failed",
+
+  "server_error": "Server connection error",
+  "invalid_server_data": "Invalid data from server",
+
+  "app_description": "Asset management & inventory",
+  "hello": "Hello",
+  "admin_page": "Admin Page",
+  "logout": "Logout",
+
+  "scan": "Scan QR",
+  "inventory": "Inventory",
+  "map": "Map",
+  "add": "Add",
+  "audit": "Audit",
+
+  "scan_qr": "Scan QR Code",
+  "auditing": "Auditing",
+  "add_new_device": "Add new device",
+
+  "start": "Start",
+  "stop": "Stop",
+  "start_scanning": "Start scanning",
+  "stop_scanning": "Stop scanning",
+
+  "not_scanned": "Not scanned",
+  "not_scanned_full": "Not scanned yet",
+  "scanning": "Scanning...",
+  "stopped": "Stopped",
+
+  "processing_qr": "Processing QR: {{qr}}",
+  "belongs_to": "Belongs to",
+  "scanned_at": "Scanned at",
+
+  "device_not_in_list": "Not in audit list",
+  "already_scanned": "Already scanned in this session",
+  "device_not_found": "Device not found",
+
+  "camera_error": "Cannot access camera. Please check permissions or use HTTPS.",
+
+  "inventory_title": "Inventory Management",
+  "all_device_types": "All device types",
+  "search": "Search...",
+  "scanned": "Scanned",
+  "all": "All",
+  "download_scans": "Download scanned list",
+
+  "qr_code": "QR Code",
+  "department": "Department",
+  "device": "device",
+  "devices": "devices",
+
+  "device_name": "Device Name",
+  "scanned_by": "Scanned by",
+  "time": "Time",
+  "unknown": "Unknown",
+  "scanned_file_name": "ScannedList",
+
+  "no_data_found": "No data found",
+  "no_devices_found": "No devices found",
+  "file_download_error": "File download error",
+
+  "select_device_type": "Select device type",
+  "select_department": "Select department",
+  "location": "Location / Notes",
+  "save_device": "Save device",
+  "cancel": "Cancel",
+
+  "start_audit": "Start Audit",
+  "stop_audit": "Stop Audit",
+  "remaining": "Remaining",
+  "audit_device_list": "Audit Device List",
+  "no_devices_for_audit": "No devices to audit",
+  "audit_assets": "Audit Assets",
+
+  "page_not_found": "Page not found",
+  "contact_it_support": "Please contact the IT department for assistance.",
+  "back_home": "Back to Home",
+
+  "department_progress": "Department Progress",
+  "no_department_data": "No department data yet",
+  "refresh": "Refresh",
+  "in_progress": "In Progress",
+  "total_scanned": "Total Scanned",
+  "compare": "Compare",
+  "export_excel": "Export Excel",
+
+  "audited": "Audited",
+  "not_audited": "Not Audited",
+
+  "success": "Success",
+  "error": "Error"
+}

@@ -1,0 +1,98 @@
+{
+  "checking": "確認中...",
+  "login": "ログイン",
+  "username": "ユーザー名",
+  "password": "パスワード",
+  "login_error": "ログイン失敗",
+
+  "server_error": "サーバー接続エラー",
+  "invalid_server_data": "サーバーからの無効なデータ",
+
+  "app_description": "資産管理と在庫管理",
+  "hello": "こんにちは",
+  "admin_page": "管理ページ",
+  "logout": "ログアウト",
+
+  "scan": "QRスキャン",
+  "inventory": "在庫",
+  "map": "マップ",
+  "add": "追加",
+  "audit": "監査",
+
+  "scan_qr": "QRコードをスキャン",
+  "auditing": "監査中",
+  "add_new_device": "新しいデバイスを追加",
+
+  "start": "開始",
+  "stop": "停止",
+  "start_scanning": "スキャン開始",
+  "stop_scanning": "スキャン停止",
+
+  "not_scanned": "未スキャン",
+  "not_scanned_full": "まだスキャンされていません",
+  "scanning": "スキャン中...",
+  "stopped": "停止しました",
+
+  "processing_qr": "QR処理中: {{qr}}",
+  "belongs_to": "所属",
+  "scanned_at": "スキャン場所",
+
+  "device_not_in_list": "監査リストにありません",
+  "already_scanned": "このセッションですでにスキャンされました",
+  "device_not_found": "デバイスが見つかりません",
+
+  "camera_error": "カメラにアクセスできません。権限またはHTTPSを確認してください。",
+
+  "inventory_title": "在庫管理",
+  "all_device_types": "すべてのデバイスタイプ",
+  "search": "検索...",
+  "scanned": "スキャン済み",
+  "all": "すべて",
+  "download_scans": "スキャン一覧をダウンロード",
+
+  "qr_code": "QRコード",
+  "department": "部門",
+  "device": "デバイス",
+  "devices": "デバイス",
+
+  "device_name": "デバイス名",
+  "scanned_by": "スキャン者",
+  "time": "時間",
+  "unknown": "不明",
+  "scanned_file_name": "スキャン一覧",
+
+  "no_data_found": "データが見つかりません",
+  "no_devices_found": "デバイスが見つかりません",
+  "file_download_error": "ファイルダウンロードエラー",
+
+  "select_device_type": "デバイスタイプを選択",
+  "select_department": "部門を選択",
+  "location": "場所 / メモ",
+  "save_device": "デバイスを保存",
+  "cancel": "キャンセル",
+
+  "start_audit": "監査開始",
+  "stop_audit": "監査停止",
+  "remaining": "残り",
+  "audit_device_list": "監査対象デバイスリスト",
+  "no_devices_for_audit": "監査対象のデバイスがありません",
+  "audit_assets": "資産を監査",
+
+  "page_not_found": "ページが見つかりません",
+  "contact_it_support": "サポートが必要な場合は、IT部門にお問い合わせください。",
+  "back_home": "ホームに戻る",
+
+  "department_progress": "部門別進捗",
+  "no_department_data": "部門データがありません",
+  "refresh": "更新",
+  "compare": "比較",
+  "export_excel": "Excelにエクスポート",
+  "in_progress": "進行中",
+  "total_scanned": "合計スキャン数",
+
+  "audited": "監査済み",
+  "not_audited": "未監査",
+
+  "success": "成功",
+  "error": "エラー"
+}

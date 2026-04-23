@@ -1,0 +1,98 @@
+{
+  "checking": "Đang kiểm tra...",
+  "login": "Đăng nhập",
+  "username": "Tên đăng nhập",
+  "password": "Mật khẩu",
+  "login_error": "Đăng nhập thất bại",
+
+  "server_error": "Lỗi kết nối server",
+  "invalid_server_data": "Dữ liệu lỗi từ server",
+
+  "app_description": "Quản lý & kiểm kê tài sản",
+  "hello": "Xin chào",
+  "admin_page": "Trang Admin",
+  "logout": "Đăng xuất",
+
+  "scan": "Quét QR",
+  "inventory": "Kiểm kê",
+  "map": "Bản đồ",
+  "add": "Thêm",
+  "audit": "Kiểm tra",
+
+  "scan_qr": "Quét mã QR",
+  "auditing": "Đang audit",
+  "add_new_device": "Thêm thiết bị mới",
+
+  "start": "Bắt đầu",
+  "stop": "Ngừng",
+  "start_scanning": "Bắt đầu quét",
+  "stop_scanning": "Ngừng quét",
+
+  "not_scanned": "Chưa quét",
+  "not_scanned_full": "Chưa quét mã",
+  "scanning": "Đang quét...",
+  "stopped": "Đã dừng quét",
+
+  "processing_qr": "Xử lý QR: {{qr}}",
+  "belongs_to": "Thuộc",
+  "scanned_at": "Quét tại",
+
+  "device_not_in_list": "Không thuộc danh sách kiểm kê",
+  "already_scanned": "Đã quét trong phiên này",
+  "device_not_found": "Không tìm thấy thiết bị",
+
+  "camera_error": "Không thể truy cập camera. Vui lòng kiểm tra quyền hoặc dùng HTTPS.",
+
+  "inventory_title": "Quản lý kiểm kê",
+  "all_device_types": "Tất cả loại thiết bị",
+  "search": "Tìm kiếm...",
+  "scanned": "Đã quét",
+  "all": "Tất cả",
+  "download_scans": "Tải danh sách đã quét",
+
+  "qr_code": "Mã QR",
+  "department": "Bộ phận",
+  "device": "thiết bị",
+  "devices": "thiết bị",
+
+  "device_name": "Tên thiết bị",
+  "scanned_by": "Người quét",
+  "time": "Thời gian",
+  "unknown": "Chưa rõ",
+  "scanned_file_name": "DanhSachDaQuet",
+
+  "no_data_found": "Không tìm thấy dữ liệu",
+  "no_devices_found": "Không tìm thấy thiết bị",
+  "file_download_error": "Lỗi tải file",
+
+  "select_device_type": "Chọn loại thiết bị",
+  "select_department": "Chọn bộ phận",
+  "location": "Vị trí / Ghi chú",
+  "save_device": "Lưu thiết bị",
+  "cancel": "Hủy",
+
+  "start_audit": "Bắt đầu kiểm tra",
+  "stop_audit": "Kết thúc kiểm tra",
+  "remaining": "Còn lại",
+  "audit_device_list": "Danh sách thiết bị cần kiểm kê",
+  "no_devices_for_audit": "Không có thiết bị nào cần kiểm kê",
+  "audit_assets": "Kiểm tra tài sản",
+
+  "page_not_found": "Trang không tồn tại",
+  "contact_it_support": "Vui lòng liên hệ bộ phận IT để được hỗ trợ.",
+  "back_home": "Về trang chủ",
+
+  "department_progress": "Tiến độ theo bộ phận",
+  "no_department_data": "Chưa có dữ liệu bộ phận",
+  "refresh": "Làm mới",
+  "in_progress": "Đang tiến hành",
+  "total_scanned": "Tổng đã quét",
+  "compare": "So sánh",
+  "export_excel": "Xuất Excel",
+
+  "audited": "Đã kiểm tra",
+  "not_audited": "Chưa kiểm tra",
+
+  "success": "Thành công",
+  "error": "Lỗi"
+}
