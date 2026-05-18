@@ -1,5 +1,5 @@
 import express from "express";
-import { getConnection } from "../config/database.js";
+import { query } from "../config/database.js";
 
 const router = express.Router();
 
@@ -13,12 +13,9 @@ function requireAdmin(req, res, next) {
 
 // ── GET /admin/audit-dashboard ──────────────────────────────
 router.get("/audit-dashboard", requireAdmin, async (req, res) => {
-  let conn;
   try {
-    conn = await getConnection();
-
     // 1. Tiến độ từng bộ phận
-    const [deptProgress] = await conn.execute(`
+    const deptProgress = await query(`
       SELECT
         d.id,
         d.name                                          AS dept_name,
@@ -34,26 +31,26 @@ router.get("/audit-dashboard", requireAdmin, async (req, res) => {
     `);
 
     // 2. Lịch sử phiên audit (20 phiên gần nhất)
-    const [sessions] = await conn.execute(`
+    const sessions = await query(`
       SELECT
         a.id,
         u.full_name                                     AS auditor_name,
         d.name                                          AS dept_name,
-        a.created_at                                    AS started_at,
+        a.started_at                                    AS started_at,
         a.ended_at,
         COUNT(s.id)                                     AS total_scanned,
-        TIMESTAMPDIFF(MINUTE, a.created_at, IFNULL(a.ended_at, NOW())) AS duration_min
+        TIMESTAMPDIFF(MINUTE, a.started_at, IFNULL(a.ended_at, NOW())) AS duration_min
       FROM audit_sessions a
       JOIN users       u ON u.id = a.user_id
       JOIN departments d ON d.id = a.department_id
       LEFT JOIN scans  s ON s.session_id = a.id
-      GROUP BY a.id, u.full_name, d.name, a.created_at, a.ended_at
-      ORDER BY a.created_at DESC
+      GROUP BY a.id, u.full_name, d.name, a.started_at, a.ended_at
+      ORDER BY a.started_at DESC
       LIMIT 20
     `);
 
     // 3. Tổng quan nhanh
-    const [[summary]] = await conn.execute(`
+    const summaryRows = await query(`
       SELECT
         (SELECT COUNT(*) FROM devices)                  AS total_devices,
         (SELECT COUNT(*) FROM scans)                    AS total_scanned,
@@ -64,24 +61,20 @@ router.get("/audit-dashboard", requireAdmin, async (req, res) => {
     res.render("audit-dashboard", {
       deptProgress,
       sessions,
-      summary,
+      summary: summaryRows[0],
       user: req.session.user
     });
 
   } catch (err) {
     console.error("AUDIT DASHBOARD ERROR:", err);
     res.status(500).send("Lỗi server: " + err.message);
-  } finally {
-    if (conn) await conn.end();
   }
 });
 
 // ── GET /api/audit/progress (JSON cho auto-refresh) ─────────
 router.get("/api/audit/progress", requireAdmin, async (req, res) => {
-  let conn;
   try {
-    conn = await getConnection();
-    const [rows] = await conn.execute(`
+    const rows = await query(`
       SELECT
         d.name AS dept_name,
         COUNT(dev.id) AS total,
@@ -96,40 +89,33 @@ router.get("/api/audit/progress", requireAdmin, async (req, res) => {
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) await conn.end();
   }
 });
 
-
-// ── GET /api/scan/audit-sessions (danh sách phiên audit cho admin) ──
+// ── GET /audit-sessions (danh sách phiên audit cho admin) ────
 router.get("/audit-sessions", requireAdmin, async (req, res) => {
-  let conn;
   try {
-    conn = await getConnection();
-    const [rows] = await conn.execute(`
+    const rows = await query(`
       SELECT
         a.id,
         u.full_name                                       AS auditor_name,
         d.name                                            AS dept_name,
-        a.created_at                                      AS started_at,
+        a.started_at                                      AS started_at,
         a.ended_at,
         COUNT(s.id)                                       AS total_scanned,
-        TIMESTAMPDIFF(MINUTE, a.created_at, IFNULL(a.ended_at, NOW())) AS duration_min
+        TIMESTAMPDIFF(MINUTE, a.started_at, IFNULL(a.ended_at, NOW())) AS duration_min
       FROM audit_sessions a
       JOIN users       u ON u.id = a.user_id
       JOIN departments d ON d.id = a.department_id
       LEFT JOIN scans  s ON s.session_id = a.id
-      GROUP BY a.id, u.full_name, d.name, a.created_at, a.ended_at
-      ORDER BY a.created_at DESC
+      GROUP BY a.id, u.full_name, d.name, a.started_at, a.ended_at
+      ORDER BY a.started_at DESC
       LIMIT 20
     `);
     res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) await conn.end();
   }
 });
 

@@ -1,0 +1,136 @@
+import express from "express";
+import bcrypt from "bcrypt";
+import { getConnection } from "../config/database.js";
+
+const router = express.Router();
+
+router.get("/logout", (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
+
+router.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  const conn = await getConnection();
+
+  const [rows] = await conn.execute(`
+    SELECT
+      u.id,
+      u.username,
+      u.password,
+      u.full_name,
+      u.role,
+      u.department_id,
+      u.section_id,
+      u.group_id,
+      u.cost_center_id,
+      dep.name  AS department_name,
+      sec.name  AS section_name,
+      grp.name  AS group_name,
+      cc.name   AS cost_center_name
+    FROM users u
+    LEFT JOIN departments  dep ON dep.id = u.department_id
+    LEFT JOIN sections     sec ON sec.id = u.section_id
+    LEFT JOIN \`groups\`   grp ON grp.id = u.group_id
+    LEFT JOIN cost_centers cc  ON cc.id  = u.cost_center_id
+    WHERE u.username = ?
+  `, [username]);
+
+  await conn.release();
+
+  if (rows.length === 0) {
+    return res.json({ success: false, message: "Sai tài khoản" });
+  }
+
+  const user = rows[0];
+
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
+    return res.json({ success: false, message: "Sai mật khẩu" });
+  }
+
+  // Lưu đầy đủ thông tin vào session
+  req.session.user = {
+    id:               user.id,
+    username:         user.username,
+    full_name:        user.full_name        || '',
+    role:             user.role,
+    department_id:    user.department_id,
+    department_name:  user.department_name  || '',
+    section_id:       user.section_id       || null,
+    section_name:     user.section_name     || '',
+    group_id:         user.group_id         || null,
+    group_name:       user.group_name       || '',
+    cost_center_id:   user.cost_center_id   || null,
+    cost_center_name: user.cost_center_name || '',
+  };
+
+  return res.json({
+    success:  true,
+    redirect: user.role === "admin" ? "/admin" : "/index"
+  });
+});
+
+
+router.post("/logout", (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
+
+router.get("/current-user", async (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+  }
+
+  // Luôn fetch lại từ DB để có thông tin mới nhất (admin có thể đã đổi dept)
+  try {
+    const conn = await getConnection();
+    const [rows] = await conn.execute(`
+      SELECT
+        u.id,
+        u.username,
+        u.full_name,
+        u.role,
+        u.department_id,
+        u.section_id,
+        u.group_id,
+        u.cost_center_id,
+        dep.name  AS department_name,
+        sec.name  AS section_name,
+        grp.name  AS group_name,
+        cc.name   AS cost_center_name
+      FROM users u
+      LEFT JOIN departments  dep ON dep.id = u.department_id
+      LEFT JOIN sections     sec ON sec.id = u.section_id
+      LEFT JOIN \`groups\`   grp ON grp.id = u.group_id
+      LEFT JOIN cost_centers cc  ON cc.id  = u.cost_center_id
+      WHERE u.id = ?
+    `, [req.session.user.id]);
+    await conn.release();
+
+    if (rows.length > 0) {
+      const u = rows[0];
+      const user = {
+        id:               u.id,
+        username:         u.username,
+        full_name:        u.full_name        || '',
+        role:             u.role,
+        department_id:    u.department_id,
+        department_name:  u.department_name  || '',
+        section_id:       u.section_id       || null,
+        section_name:     u.section_name     || '',
+        group_id:         u.group_id         || null,
+        group_name:       u.group_name       || '',
+        cost_center_id:   u.cost_center_id   || null,
+        cost_center_name: u.cost_center_name || '',
+      };
+      // Cập nhật session luôn
+      req.session.user = user;
+      return res.json({ success: true, user });
+    }
+  } catch (err) {
+    console.error("current-user error:", err);
+  }
+
+  // Fallback: trả session cũ nếu DB lỗi
+  res.json({ success: true, user: req.session.user });
+});
+export default router;

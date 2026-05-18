@@ -6,12 +6,12 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://192.168.88.131:3000",
+        target: "https://192.168.88.129:3000",
         changeOrigin: true,
         secure: false,
       },
       "/logout": {
-        target: "https://192.168.88.131:3000",
+        target: "https://192.168.88.129:3000",
         changeOrigin: true,
         secure: false,
       },

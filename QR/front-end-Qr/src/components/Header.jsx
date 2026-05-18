@@ -1,9 +1,10 @@
+import { useTranslation } from "react-i18next";
 export default function Header({ currentUser }) {
   const isAdmin = currentUser?.role === 'admin';
-
+  const { t, i18n } = useTranslation();
   const handleLogout = async () => {
     try {
-      await fetch('/logout', { method: 'GET' });
+      await fetch('/api/logout', { method: 'POST' });
     } catch {}
     // Xóa session storage audit nếu có
     try { sessionStorage.removeItem('audit_session_state'); } catch {}
@@ -11,7 +12,7 @@ export default function Header({ currentUser }) {
   };
 
   return (
-    <header className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex items-center justify-between">
+    <header className="bg-[#079DD9] text-white p-4 flex items-center justify-between">
       <div className="flex items-center space-x-3">
         <img
           src="./src/assets/1041882.png"
@@ -19,28 +20,31 @@ export default function Header({ currentUser }) {
           alt="logo"
         />
         <div>
-          <div className="font-bold text-lg">ScanPro</div>
-          <div className="text-xs opacity-80">Quản lý &amp; kiểm kê tài sản</div>
+          <div className="font-bold text-lg">SMC - IT Equipment Inventory</div>
+          <div className="text-xs opacity-80">{t("app_description")}</div>
         </div>
       </div>
 
       <div className="flex items-center space-x-3">
         <div className="text-sm">
-          👋 Xin chào{currentUser?.username ? `, ${currentUser.username}` : ''}
+          👋 {t("hello")}
+          {currentUser?.username ? `, ${currentUser.username}` : ''}
         </div>
+
         {isAdmin && (
           <button
             onClick={() => (window.location.href = '/admin')}
             className="bg-yellow-400 text-gray-800 px-3 py-1 rounded-lg text-sm"
           >
-            Trang Admin
+            {t("admin_page")}
           </button>
         )}
+
         <button
           onClick={handleLogout}
-          className="bg-red-500 px-3 py-1 rounded-lg shadow hover:bg-red-600 text-sm"
+          className="bg-[#F24444] hover:bg-[#d93a3a] px-3 py-1 rounded-lg shadow text-sm text-white font-medium transition-colors"
         >
-          Đăng xuất
+          {t("logout")}
         </button>
       </div>
     </header>

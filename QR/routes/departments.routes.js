@@ -1,150 +1,117 @@
 import express from "express";
-import { getConnection } from "../config/database.js";
+import { query } from "../config/database.js";
 
 const router = express.Router();
 
 /* GET /api/departments */
 router.get("/", async (req, res) => {
-
- try {
-
-  const conn = await getConnection();
-
-  const [rows] = await conn.execute(
-   "SELECT * FROM departments"
-  );
-
-  await conn.end();
-
-  res.json(rows);
-
- } catch (err) {
-
-  console.error(err);
-
-  res.status(500).json({
-   success:false,
-   message:"Server error"
-  });
-
- }
-
+  try {
+    const rows = await query("SELECT * FROM departments ORDER BY name");
+    res.json(rows);
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
-/* DELETE department */
+
+/* POST /api/departments */
+router.post("/", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ success: false, message: "Thiếu tên" });
+
+    const dup = await query("SELECT id FROM departments WHERE LOWER(name) = LOWER(?) LIMIT 1", [name.trim()]);
+    if (dup.length) return res.status(409).json({ success: false, message: `Bộ phận "${name.trim()}" đã tồn tại` });
+
+    const result = await query("INSERT INTO departments (name) VALUES (?)", [name.trim()]);
+    res.json({ success: true, id: result.insertId });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+/* PUT /api/departments/:id */
+router.put("/:id", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ success: false, message: "Thiếu tên" });
+
+    const dup = await query("SELECT id FROM departments WHERE LOWER(name) = LOWER(?) AND id != ? LIMIT 1", [name.trim(), req.params.id]);
+    if (dup.length) return res.status(409).json({ success: false, message: `Bộ phận "${name.trim()}" đã tồn tại` });
+
+    await query("UPDATE departments SET name = ? WHERE id = ?", [name.trim(), req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+/* DELETE /api/departments/:id — cascade xóa toàn bộ cấu trúc bên trong */
 router.delete("/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
 
-try {
+    // Lấy sections của dept
+    const secs = await query("SELECT id FROM sections WHERE department_id = ?", [id]);
+    for (const s of secs) {
+      // Lấy groups của section
+      const grps = await query("SELECT id FROM `groups` WHERE section_id = ?", [s.id]);
+      for (const g of grps) {
+        await query("DELETE FROM cost_centers WHERE group_id = ?", [g.id]);
+      }
+      await query("DELETE FROM `groups`      WHERE section_id = ?", [s.id]);
+      await query("DELETE FROM cost_centers  WHERE section_id = ?", [s.id]);
+    }
+    await query("DELETE FROM sections     WHERE department_id = ?", [id]);
+    await query("DELETE FROM cost_centers WHERE department_id = ?", [id]);
+    await query("DELETE FROM departments  WHERE id = ?",            [id]);
 
-const conn = await getConnection();
-
-const id = req.params.id;
-
-await conn.execute(
-"DELETE FROM departments WHERE id=?",
-[id]
-);
-
-await conn.end();
-
-res.json({
-success:true,
-message:"Xóa bộ phận thành công"
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-} catch(err){
-
-console.error(err);
-
-res.status(500).json({
-success:false,
-message:"Lỗi server"
+/* GET /api/departments/:id/sections */
+router.get("/:id/sections", async (req, res) => {
+  try {
+    const rows = await query("SELECT * FROM sections WHERE department_id = ? ORDER BY name", [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-}
+/* POST /api/departments/:id/sections */
+router.post("/:id/sections", async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ success: false, message: "Thiếu tên" });
 
+    const dup = await query(
+      "SELECT id FROM sections WHERE department_id = ? AND LOWER(name) = LOWER(?) LIMIT 1",
+      [req.params.id, name.trim()]
+    );
+    if (dup.length) return res.status(409).json({ success: false, message: `Section "${name.trim()}" đã tồn tại` });
+
+    const result = await query(
+      "INSERT INTO sections (name, department_id) VALUES (?, ?)",
+      [name.trim(), req.params.id]
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-/* GET /api/departments/:deptId/devices */
-router.get("/:deptId/devices", async (req, res) => {
+/* GET /api/departments/:id/cost-centers */
+router.get("/:id/cost-centers", async (req, res) => {
+  try {
+    const rows = await query("SELECT * FROM cost_centers WHERE department_id = ? ORDER BY name", [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
- try {
-
-  const { deptId } = req.params;
-
-  const conn = await getConnection();
-
-  const [rows] = await conn.execute(`
-SELECT 
-  d.id,
-  d.name,
-  d.qr_code,
-  d.location,
-
-  dep.name AS device_department,
-  dep_scan.name AS current_department,
-
-  dt.name AS device_type_name,
-
-  CASE 
-    WHEN s.id IS NULL THEN 'Chưa quét'
-
-    WHEN d.department_id = s.scan_department 
-      THEN CONCAT('Đang ở ', dep_scan.name)
-
-    WHEN d.department_id != s.scan_department 
-      AND s.scan_department = ?
-      THEN CONCAT('Chuyển từ ', dep.name)
-
-    WHEN d.department_id != s.scan_department 
-      AND d.department_id = ?
-      THEN CONCAT('Đã chuyển đến ', dep_scan.name)
-
-    ELSE '-'
-  END AS status
-
-FROM devices d
-
-LEFT JOIN device_types dt 
-ON dt.id = d.device_type_id
-
-LEFT JOIN departments dep 
-ON dep.id = d.department_id
-
-/* 🔥 lấy scan mới nhất */
-LEFT JOIN (
-  SELECT s1.*
-  FROM scans s1
-  INNER JOIN (
-    SELECT device_id, MAX(scanned_at) AS max_time
-    FROM scans
-    GROUP BY device_id
-  ) latest
-  ON s1.device_id = latest.device_id 
-  AND s1.scanned_at = latest.max_time
-) s ON s.device_id = d.id
-
-LEFT JOIN departments dep_scan 
-ON dep_scan.id = s.scan_department
-
-WHERE 
-  d.department_id = ?
-  OR s.scan_department = ?
-`, [deptId, deptId, deptId, deptId]);
-  await conn.end();
-
-  res.json(rows);
-
- } catch (err) {
-
-  console.error(err);
-
-  res.status(500).json({
-   success:false,
-   message:"Server error"
-  });
-
- }
-
+/* GET /api/departments/all-hierarchy
+   Trả toàn bộ sections, groups, cost_centers trong 1 request
+   Thay vì N+M+K request riêng lẻ */
+router.get("/all-hierarchy", async (req, res) => {
+  try {
+    const [departments, sections, groups, costs] = await Promise.all([
+      query("SELECT * FROM departments ORDER BY name"),
+      query("SELECT * FROM sections ORDER BY name"),
+      query("SELECT * FROM `groups` ORDER BY name"),
+      query("SELECT * FROM cost_centers ORDER BY name"),
+    ]);
+    res.json({ departments, sections, groups, costs });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 export default router;

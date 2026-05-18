@@ -1,160 +1,177 @@
 import express from "express";
-import multer from "multer";
-import XLSX from "xlsx";
-import fs from "fs";
-import { getConnection } from "../config/database.js";
-import { checkCanAddDevice } from "../middleware/devicePermission.js";
+import multer  from "multer";
+import XLSX    from "xlsx";
+import fs      from "fs";
+import { query, transaction } from "../config/database.js";
+import { checkAdmin }         from "../middleware/admin.js";
 
 const router = express.Router();
-
 const upload = multer({ dest: "uploads/" });
 
-router.post("/", checkCanAddDevice, upload.single("file"), async (req, res) => {
+const normalize = (str) =>
+  String(str || "")
+    .normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .normalize("NFD") .replace(/[\u0300-\u036f]/g, "")
+    .trim().replace(/\s+/g, " ").toLowerCase();
 
- try {
-
-  if (!req.file) {
-   return res.status(400).json({
-    success:false,
-    message:"Không có file upload"
-   });
+const getVal = (row, keys) => {
+  for (const k of keys) {
+    const v = row[k];
+    if (v !== undefined && v !== null && v !== "") return String(v).trim();
   }
+  return "";
+};
 
-  // đọc file Excel
-  const workbook = XLSX.readFile(req.file.path);
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
+router.post(
+  "/",
+  checkAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    try {
 
-  const conn = await getConnection();
+      /* ── 1. READ ROWS ── */
+      let rows = [];
+      if (req.body.mappedData) {
+        rows = JSON.parse(req.body.mappedData);
+      } else {
+        const wb    = XLSX.readFile(req.file.path);
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rows        = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      }
 
-  const currentUser = req.session.user;
+      /* ── 2. LOAD CACHE (ngoài transaction) ── */
+      const cache = {
+        depts:       await query("SELECT id, name FROM departments"),
+        sections:    await query("SELECT id, name, department_id FROM sections"),
+        groups:      await query("SELECT id, name, section_id FROM `groups`"),
+        ccs:         await query("SELECT id, name, group_id FROM cost_centers"),
+        deviceTypes: await query("SELECT id, name FROM device_types"),
+      };
 
-  let added = 0;
-  let updated = 0;
-  let skipped = 0;
+      /* ── 3. PROCESS ROWS (trong transaction) ── */
+      let added = 0, updated = 0, errors = [];
 
-  for (let row of rows) {
+      await transaction(async (conn) => {
 
-   const name = row.Name || row.name || null;
-   const qrCode = row.QR_Code || row.qr_code || null;
-   const departmentName = row.Department || row.department || null;
-   const deviceTypeName = row.DeviceType || row.deviceType || null;
-   const location = row.Location || row.location || "";
+        /* ── FIND OR CREATE ── */
+        const findOrCreate = async (table, arr, name, parentCol, parentId) => {
+          const trimmed = (name || "").trim();
+          if (!trimmed) return null;
+          const norm = normalize(trimmed);
 
-   if (!name || !qrCode || !departmentName) {
-    skipped++;
-    continue;
-   }
+          const found = arr.find(r =>
+            normalize(r.name) === norm &&
+            (!parentCol || r[parentCol] == parentId)
+          );
+          if (found) return found.id;
 
-   // tìm department
-   let [dept] = await conn.execute(
-    "SELECT id FROM departments WHERE name=?",
-    [departmentName]
-   );
+          let checkSql, checkParams;
+          if (parentCol && parentId != null) {
+            checkSql    = "SELECT id FROM `" + table + "` WHERE name=? AND " + parentCol + "=? LIMIT 1";
+            checkParams = [trimmed, parentId];
+          } else {
+            checkSql    = "SELECT id FROM `" + table + "` WHERE name=? LIMIT 1";
+            checkParams = [trimmed];
+          }
+          const [existing] = await conn.execute(checkSql, checkParams);
+          if (existing.length > 0) {
+            const row = { id: existing[0].id, name: trimmed };
+            if (parentCol) row[parentCol] = parentId;
+            arr.push(row);
+            return existing[0].id;
+          }
 
-   let departmentId;
+          let insertSql, insertParams;
+          if (parentCol && parentId != null) {
+            insertSql    = "INSERT INTO `" + table + "` (name, " + parentCol + ") VALUES (?, ?)";
+            insertParams = [trimmed, parentId];
+          } else {
+            insertSql    = "INSERT INTO `" + table + "` (name) VALUES (?)";
+            insertParams = [trimmed];
+          }
+          const [result] = await conn.execute(insertSql, insertParams);
+          const newId    = result.insertId;
+          const newRow   = { id: newId, name: trimmed };
+          if (parentCol) newRow[parentCol] = parentId;
+          arr.push(newRow);
+          return newId;
+        };
 
-   if (dept.length === 0) {
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
 
-    const [result] = await conn.execute(
-     "INSERT INTO departments(name) VALUES(?)",
-     [departmentName]
-    );
+          const name     = getVal(row, ["name",      "Name"]);
+          const qr_code  = getVal(row, ["qr_code",   "QR_Code"]);
+          const deptName = getVal(row, ["department", "Department"]);
+          const secName  = getVal(row, ["section",    "Section"]);
+          const grpName  = getVal(row, ["group",      "Group"]);
+          const ccName   = getVal(row, ["costCenter", "CostCenter", "cost_center", "Cost Center"]);
+          const dtName   = getVal(row, ["deviceType", "DeviceType", "device_type", "Device Type", "Loại thiết bị"]);
+          const location = getVal(row, ["location",   "Location"]);
 
-    departmentId = result.insertId;
+          if (!name || !qr_code) continue;
 
-   } else {
+          try {
+            const department_id  = await findOrCreate("departments",  cache.depts,       deptName, null,            null);
+            const section_id     = await findOrCreate("sections",     cache.sections,    secName,  "department_id", department_id);
+            const group_id       = await findOrCreate("groups",       cache.groups,      grpName,  "section_id",    section_id);
+            const cost_center_id = await findOrCreate("cost_centers", cache.ccs,         ccName,   "group_id",      group_id);
+            const device_type_id = await findOrCreate("device_types", cache.deviceTypes, dtName,   null,            null);
 
-    departmentId = dept[0].id;
+            const [exist] = await conn.execute(
+              "SELECT id FROM devices WHERE qr_code=? LIMIT 1", [qr_code]
+            );
 
-   }
+            if (exist.length > 0) {
+              await conn.execute(`
+                UPDATE devices
+                SET name=?, device_type_id=?, department_id=?, section_id=?, group_id=?, cost_center_id=?, location=?
+                WHERE qr_code=?
+              `, [name, device_type_id, department_id, section_id, group_id, cost_center_id, location || null, qr_code]);
+              updated++;
+            } else {
+              await conn.execute(`
+                INSERT INTO devices (name, qr_code, device_type_id, department_id, section_id, group_id, cost_center_id, location, is_new)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+              `, [name, qr_code, device_type_id, department_id, section_id, group_id, cost_center_id, location || null]);
+              added++;
+            }
 
-   // kiểm tra quyền user
-   if (
-    currentUser.role === "user" &&
-    Number(currentUser.department_id) !== Number(departmentId)
-   ) {
-    skipped++;
-    continue;
-   }
+          } catch (rowErr) {
+            console.error("[ROW " + (i + 2) + "]", rowErr.message);
+            errors.push({ row: i + 2, qr_code, name, error: rowErr.message });
+          }
+        }
+      }); // ← transaction tự commit/rollback/release
 
-   // tìm device type
-   let deviceTypeId = null;
+      if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
-   if (deviceTypeName) {
+      /* ── 4. DEBUG CHECK (sau transaction) ── */
+      const secCheck = await query("SELECT id, name, department_id FROM sections");
+      const grpCheck = await query("SELECT id, name, section_id FROM `groups`");
+      const ccCheck  = await query("SELECT id, name, group_id FROM cost_centers");
 
-    let [dt] = await conn.execute(
-     "SELECT id FROM device_types WHERE name=?",
-     [deviceTypeName]
-    );
+      res.json({
+        success: true,
+        message: "✅ Thêm mới: " + added + " | Cập nhật: " + updated +
+                 (errors.length ? " | Lỗi: " + errors.length : ""),
+        added, updated, errors,
+        db_sections:     secCheck,
+        db_groups:       grpCheck,
+        db_cost_centers: ccCheck,
+        cache_after: {
+          sections:     cache.sections,
+          groups:       cache.groups,
+          cost_centers: cache.ccs,
+        }
+      });
 
-    if (dt.length === 0) {
-
-     const [result] = await conn.execute(
-      "INSERT INTO device_types(name) VALUES(?)",
-      [deviceTypeName]
-     );
-
-     deviceTypeId = result.insertId;
-
-    } else {
-
-     deviceTypeId = dt[0].id;
-
+    } catch (err) {
+      if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      console.error("[UPLOAD FATAL]", err.message);
+      res.status(500).json({ success: false, message: err.message });
     }
-
-   }
-
-   // kiểm tra QR tồn tại
-   const [existing] = await conn.execute(
-    "SELECT id FROM devices WHERE qr_code=?",
-    [qrCode]
-   );
-
-   if (existing.length === 0) {
-
-    await conn.execute(`
-     INSERT INTO devices
-     (name, qr_code, department_id, device_type_id, location)
-     VALUES (?,?,?,?,?)
-    `,[name, qrCode, departmentId, deviceTypeId, location]);
-
-    added++;
-
-   } else {
-
-    await conn.execute(`
-     UPDATE devices
-     SET name=?, department_id=?, device_type_id=?, location=?
-     WHERE qr_code=?
-    `,[name, departmentId, deviceTypeId, location, qrCode]);
-
-    updated++;
-
-   }
-
   }
-
-  await conn.end();
-
-  fs.unlinkSync(req.file.path);
-
-  res.json({
-   success:true,
-   message:`Import xong. Thêm: ${added}, Cập nhật: ${updated}, Bỏ qua: ${skipped}`
-  });
-
- } catch (err) {
-
-  console.error("Import error:",err);
-
-  res.status(500).json({
-   success:false,
-   message:"Lỗi import Excel"
-  });
-
- }
-
-});
+);
 
 export default router;

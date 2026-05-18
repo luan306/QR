@@ -1,0 +1,250 @@
+
+https://github.com/microsoftarchive/redis/releases/tag/win-3.0.504
+Redis-x64-3.0.504.msi
+
+kiểm tra: redis-cli ping
+
+npm i compression helmet redis connect-redis
+
+tạo session:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+SESSION_SECRET=kết_quả_vừa_copy_ở_trên
+
+
+bảo mật : 
+npm i bcrypt express-validator
+
+
+===========================database==============
+USE inventory;
+SET FOREIGN_KEY_CHECKS = 0;
+SET SQL_SAFE_UPDATES   = 0;
+ 
+-- Xóa bảng cũ nếu đã tạo sai kiểu (từ bước trước)
+DROP TABLE IF EXISTS cost_centers;
+DROP TABLE IF EXISTS `groups`;
+DROP TABLE IF EXISTS sections;
+
+
+CREATE TABLE sections (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  department_id BIGINT UNSIGNED NOT NULL,
+  name          VARCHAR(100)    NOT NULL,
+  created_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_sections_department
+    FOREIGN KEY (department_id) REFERENCES departments(id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE `groups` (
+  id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  section_id BIGINT UNSIGNED NOT NULL,
+  name       VARCHAR(100)    NOT NULL,
+  created_at TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_groups_section
+    FOREIGN KEY (section_id) REFERENCES sections(id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE cost_centers (
+  id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  group_id   BIGINT UNSIGNED NOT NULL,
+  name       VARCHAR(100)    NOT NULL,
+  created_at TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cost_centers_group
+    FOREIGN KEY (group_id) REFERENCES `groups`(id)
+    ON DELETE CASCADE
+);
+
+
+SET @c1 = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND COLUMN_NAME='section_id');
+SET @s1 = IF(@c1=0,
+  'ALTER TABLE devices ADD COLUMN section_id BIGINT UNSIGNED NULL',
+  'SELECT "section_id exists"');
+PREPARE s FROM @s1; EXECUTE s; DEALLOCATE PREPARE s;
+ 
+SET @c2 = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND COLUMN_NAME='group_id');
+SET @s2 = IF(@c2=0,
+  'ALTER TABLE devices ADD COLUMN group_id BIGINT UNSIGNED NULL',
+  'SELECT "group_id exists"');
+PREPARE s FROM @s2; EXECUTE s; DEALLOCATE PREPARE s;
+ 
+SET @c3 = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND COLUMN_NAME='cost_center_id');
+SET @s3 = IF(@c3=0,
+  'ALTER TABLE devices ADD COLUMN cost_center_id BIGINT UNSIGNED NULL',
+  'SELECT "cost_center_id exists"');
+PREPARE s FROM @s3; EXECUTE s; DEALLOCATE PREPARE s;
+ 
+-- FK devices → sections / groups / cost_centers
+SET @f1 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND CONSTRAINT_NAME='fk_devices_section');
+SET @s4 = IF(@f1=0,
+  'ALTER TABLE devices ADD CONSTRAINT fk_devices_section FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE SET NULL',
+  'SELECT "fk_devices_section exists"');
+PREPARE s FROM @s4; EXECUTE s; DEALLOCATE PREPARE s;
+ 
+SET @f2 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND CONSTRAINT_NAME='fk_devices_group');
+SET @s5 = IF(@f2=0,
+  'ALTER TABLE devices ADD CONSTRAINT fk_devices_group FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE SET NULL',
+  'SELECT "fk_devices_group exists"');
+PREPARE s FROM @s5; EXECUTE s; DEALLOCATE PREPARE s;
+ 
+SET @f3 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices' AND CONSTRAINT_NAME='fk_devices_cost_center');
+SET @s6 = IF(@f3=0,
+  'ALTER TABLE devices ADD CONSTRAINT fk_devices_cost_center FOREIGN KEY (cost_center_id) REFERENCES cost_centers(id) ON DELETE SET NULL',
+  'SELECT "fk_devices_cost_center exists"');
+PREPARE s FROM @s6; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET FOREIGN_KEY_CHECKS = 1;
+SET SQL_SAFE_UPDATES   = 1;
+
+SELECT 'sections' AS tbl, COUNT(*) AS rows FROM sections
+UNION ALL SELECT 'groups',       COUNT(*) FROM `groups`
+UNION ALL SELECT 'cost_centers', COUNT(*) FROM cost_centers;
+
+SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA='inventory' AND TABLE_NAME='devices'
+  AND COLUMN_NAME IN ('section_id','group_id','cost_center_id');
+  
+  SELECT 'sections'     AS tbl, COUNT(*) AS total FROM sections
+UNION ALL
+SELECT 'groups',               COUNT(*) AS total FROM `groups`
+UNION ALL
+SELECT 'cost_centers',         COUNT(*) AS total FROM cost_centers;
+select * from cost_centers;
+
+SELECT COLUMN_NAME, COLUMN_TYPE 
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'inventory' 
+  AND TABLE_NAME   = 'devices'
+  AND COLUMN_NAME  IN ('section_id', 'group_id', 'cost_center_id');
+  SELECT DATABASE();
+  SELECT * FROM sections;
+  SELECT id, name FROM departments WHERE name LIKE '%Valve%';
+  SELECT 'sections'     AS tbl, COUNT(*) AS total FROM sections
+UNION ALL
+SELECT 'groups',               COUNT(*) AS total FROM `groups`
+UNION ALL
+SELECT 'cost_centers',         COUNT(*) AS total FROM cost_centers;
+
+
+-- sections: unique theo (name, department_id)
+ALTER TABLE sections
+  ADD CONSTRAINT uq_sections_name_dept 
+  UNIQUE (name, department_id);
+
+-- groups: unique theo (name, section_id)  
+ALTER TABLE `groups`
+  ADD CONSTRAINT uq_groups_name_section
+  UNIQUE (name, section_id);
+
+-- cost_centers: unique theo (name, group_id)
+ALTER TABLE cost_centers
+  ADD CONSTRAINT uq_cost_centers_name_group
+  UNIQUE (name, group_id);
+
+
+SHOW INDEX FROM devices WHERE Column_name = 'qr_code';
+
+
+ALTER TABLE sections 
+ADD UNIQUE KEY uniq_section (department_id, name);
+
+ALTER TABLE `groups`
+ADD UNIQUE KEY uniq_group (section_id, name);
+
+ALTER TABLE cost_centers
+ADD UNIQUE KEY uniq_cc (group_id, name);
+
+
+ALTER TABLE sections 
+ADD UNIQUE uk_section (department_id, name);
+
+ALTER TABLE `groups` 
+ADD UNIQUE uk_group (section_id, name);
+
+ALTER TABLE cost_centers 
+ADD UNIQUE uk_cc (group_id, name);
+
+CREATE INDEX idx_sections_department ON sections(department_id);
+CREATE INDEX idx_groups_section ON `groups`(section_id);
+CREATE INDEX idx_cc_group ON cost_centers(group_id);
+
+CREATE INDEX idx_devices_section ON devices(section_id);
+CREATE INDEX idx_devices_group ON devices(group_id);
+CREATE INDEX idx_devices_cc ON devices(cost_center_id);
+
+ON DELETE SET NULL
+
+
+ALTER TABLE users
+  ADD COLUMN section_id     BIGINT UNSIGNED NULL,
+  ADD COLUMN group_id       BIGINT UNSIGNED NULL,
+  ADD COLUMN cost_center_id BIGINT UNSIGNED NULL;
+  
+ SET SQL_SAFE_UPDATES = 0;
+UPDATE devices SET is_new = 0 WHERE is_new = 1;
+SET SQL_SAFE_UPDATES = 1;
+
+ALTER TABLE devices ADD COLUMN added_by BIGINT UNSIGNED NULL;
+
+
+
+-- Chạy từng block một, bỏ qua nếu báo "Duplicate key name"
+-- ============================================================
+ 
+-- devices
+ALTER TABLE devices ADD INDEX idx_devices_qr     (qr_code);
+ALTER TABLE devices ADD INDEX idx_devices_dept   (department_id);
+ALTER TABLE devices ADD INDEX idx_devices_is_new (is_new);
+ALTER TABLE devices ADD INDEX idx_devices_type   (device_type_id);
+ 
+-- scans
+ALTER TABLE scans ADD INDEX idx_scans_device    (device_id);
+ALTER TABLE scans ADD INDEX idx_scans_session   (session_id);
+ALTER TABLE scans ADD INDEX idx_scans_dept      (scan_department);
+ALTER TABLE scans ADD INDEX idx_scans_user      (user_id);
+ALTER TABLE scans ADD INDEX idx_scans_at        (scanned_at);
+ALTER TABLE scans ADD INDEX idx_scans_device_at (device_id, scanned_at);
+ 
+-- audit_sessions
+ALTER TABLE audit_sessions ADD INDEX idx_audit_dept_ended (department_id, ended_at);
+ALTER TABLE audit_sessions ADD INDEX idx_audit_user       (user_id);
+ALTER TABLE audit_sessions ADD INDEX idx_audit_started    (started_at);
+ 
+-- users
+ALTER TABLE users ADD INDEX idx_users_dept (department_id);
+ 
+-- sections / groups / cost_centers
+ALTER TABLE sections     ADD INDEX idx_sections_dept  (department_id);
+ALTER TABLE `groups`     ADD INDEX idx_groups_section (section_id);
+ALTER TABLE cost_centers ADD INDEX idx_cc_group       (group_id);
+ 
+-- Kiểm tra kết quả
+SHOW INDEX FROM devices;
+SHOW INDEX FROM scans;
+SHOW INDEX FROM audit_sessions;
+ 
+-- Kiểm tra kết quả
+SHOW INDEX FROM devices;
+SHOW INDEX FROM scans;
+SHOW INDEX FROM audit_sessions;
+
+select * from devices;
+select * from users;
+
+DESCRIBE users;
+
+SELECT id, name, qr_code, is_new FROM devices ORDER BY id DESC LIMIT 10;
+
+SET SQL_SAFE_UPDATES = 0;
+UPDATE devices SET is_new = 0 WHERE is_new = 1;
+SET SQL_SAFE_UPDATES = 1;
+
+DESCRIBE audit_sessions;

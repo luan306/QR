@@ -113,7 +113,7 @@ function ZoomableMap({ imageUrl, devices, highlightId, pinMode, onMapClick, onPi
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       onWheel={onWheel} onClick={handleClick}>
       {pinMode && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none whitespace-nowrap shadow">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-[#079DD9] text-white text-xs px-3 py-1.5 rounded-full pointer-events-none whitespace-nowrap shadow">
           Tap vào đúng vị trí thiết bị trên bản đồ
         </div>
       )}
@@ -129,8 +129,11 @@ function ZoomableMap({ imageUrl, devices, highlightId, pinMode, onMapClick, onPi
         {devices.map(dev => {
           if (dev.pos_x==null) return null;
           const {x,y}=pctToPx(dev.pos_x,dev.pos_y);
-          const isHL=dev.id===highlightId;
-          const color=isHL?'#f59e0b':'#6366f1';
+          const isHL    = dev.id === highlightId;
+          const color   = isHL ? '#f59e0b'
+                        : dev.inv_status === 'scanned'     ? '#22c55e'   // xanh lá = đã quét
+                        : dev.inv_status === 'not_scanned' ? '#F24444'   // đỏ = chưa quét
+                        : '#079DD9';                                      // xanh = không có round
           return (
             <div key={dev.id} className="absolute -translate-x-1/2 -translate-y-full z-10" style={{left:x,top:y}}
               onClick={e=>{e.stopPropagation();onPinClick(dev);}}>
@@ -284,7 +287,7 @@ export default function MapPage() {
       <main className="flex-1 flex flex-col p-3 pb-20 gap-3 overflow-auto">
 
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-indigo-700">🗺️ Bản đồ xưởng</h2>
+          <h2 className="text-lg font-bold text-[#079DD9]">🗺️ Bản đồ xưởng</h2>
           <div className="flex items-center gap-2">
             {isLocked && <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">🔒 Đã khóa</span>}
             {step==='scanning' && (
@@ -305,7 +308,7 @@ export default function MapPage() {
                 <button key={f.id}
                   onClick={() => { setSelFactory(String(f.id)); setSelWorkshop(''); resetSelection(); }}
                   disabled={step==='scanning'}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selFactory===String(f.id)?'bg-indigo-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50'}`}>
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selFactory===String(f.id)?'bg-[#079DD9] text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50'}`}>
                   🏭 {f.name}
                 </button>
               ))}
@@ -321,7 +324,7 @@ export default function MapPage() {
                   <button key={w.id}
                     onClick={() => { setSelWorkshop(String(w.id)); resetSelection(); }}
                     disabled={step==='scanning'}
-                    className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${selWorkshop===String(w.id)?'bg-indigo-100 text-indigo-700 border border-indigo-300':'bg-gray-50 text-gray-600 border border-gray-200 hover:border-indigo-300 disabled:opacity-50'}`}>
+                    className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${selWorkshop===String(w.id)?'bg-[#e8f6fd] text-[#0589c0] border border-[#079DD9]/30':'bg-gray-50 text-gray-600 border border-gray-200 hover:border-[#079DD9] disabled:opacity-50'}`}>
                     {w.name}
                   </button>
                 ))}
@@ -338,7 +341,7 @@ export default function MapPage() {
                   <button key={f.value}
                     onClick={() => { setSelFloor(f.value); resetSelection(); }}
                     disabled={step==='scanning'}
-                    className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${selFloor===f.value?'bg-indigo-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50'}`}>
+                    className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${selFloor===f.value?'bg-[#079DD9] text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50'}`}>
                     {f.label}
                   </button>
                 ))}
@@ -352,7 +355,7 @@ export default function MapPage() {
               {step === 'select' ? (
                 // Bước chưa scan: chỉ có nút "Bắt đầu scan"
                 <button onClick={() => setStep('scanning')}
-                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
+                  className="flex-1 py-3 bg-[#079DD9] text-white rounded-xl text-sm font-semibold hover:bg-[#0589c0]">
                   ▶️ Bắt đầu scan
                 </button>
               ) : (
@@ -405,37 +408,39 @@ export default function MapPage() {
 
         {/* Legend */}
         {currentLayout?.image_url && (
-          <div className="flex gap-4 text-xs text-gray-400 justify-center">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-indigo-500 inline-block"/>Đã ghim</span>
+          <div className="flex flex-wrap gap-3 text-xs text-gray-400 justify-center">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 inline-block"/>Đã quét</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#F24444] inline-block"/>Chưa quét</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#079DD9] inline-block"/>Không có đợt</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block"/>Đang xem</span>
           </div>
         )}
 
         {/* Panel đang ghim */}
         {pinDevice && pinMode && !isLocked && step==='scanning' && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <div className="bg-[#e8f6fd] border border-[#079DD9]/30 rounded-xl p-4">
             <div className="flex items-start justify-between mb-1">
               <div>
-                <div className="font-semibold text-indigo-700">📌 Ghim vị trí: {pinDevice.name}</div>
-                <div className="text-xs text-indigo-400 mt-0.5">{pinDevice.device_type_name} · QR: {pinDevice.qr_code}</div>
+                <div className="font-semibold text-[#0589c0]">📌 Ghim vị trí: {pinDevice.name}</div>
+                <div className="text-xs text-[#079DD9]/60 mt-0.5">{pinDevice.device_type_name} · QR: {pinDevice.qr_code}</div>
               </div>
               <button onClick={() => { setPinMode(false); setPinDevice(null); }}
                 className="text-xs text-gray-400 hover:text-gray-600 border px-3 py-1.5 rounded-lg">Bỏ qua</button>
             </div>
-            <p className="text-xs text-indigo-500 mt-2">Tap lên bản đồ phía trên để đặt vị trí chính xác của thiết bị</p>
+            <p className="text-xs text-[#079DD9] mt-2">Tap lên bản đồ phía trên để đặt vị trí chính xác của thiết bị</p>
           </div>
         )}
 
         {/* Panel xác nhận */}
         {confirmDev && (
-          <div className="bg-white rounded-xl shadow p-4 border border-indigo-100">
+          <div className="bg-white rounded-xl shadow p-4 border border-[#079DD9]/20">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <div className="font-bold text-gray-800">{confirmDev.name}</div>
                 <div className="text-xs text-gray-400">{confirmDev.device_type_name} · {confirmDev.department_name}</div>
                 <div className="text-xs text-gray-400">QR: {confirmDev.qr_code}</div>
                 {confirmDev.pos_x!=null && (
-                  <div className="text-xs text-indigo-500 mt-1">
+                  <div className="text-xs text-[#079DD9] mt-1">
                     📍 {FLOORS.find(f=>f.value===confirmDev.floor)?.label} · X:{confirmDev.pos_x?.toFixed(1)}% Y:{confirmDev.pos_y?.toFixed(1)}%
                   </div>
                 )}
@@ -447,7 +452,7 @@ export default function MapPage() {
               <button onClick={() => confirmPosition(true)} className="flex-1 py-2.5 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600">✅ Đúng rồi</button>
               {!isLocked && <button onClick={() => confirmPosition(false)} className="flex-1 py-2.5 bg-red-100 text-red-600 rounded-xl text-sm font-medium hover:bg-red-200">❌ Sai, ghim lại</button>}
             </div>
-            <button onClick={continueScan} className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700">
+            <button onClick={continueScan} className="w-full py-2.5 bg-[#079DD9] text-white rounded-xl text-sm font-medium hover:bg-[#0589c0]">
               ➡️ Tiếp tục scan
             </button>
           </div>

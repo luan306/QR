@@ -28,21 +28,35 @@ export default defineConfig({
     include: ['pdfjs-dist'],
   },
   server: {
+    watch: {
+      usePolling: true,   // fix HMR khi dùng WSL / network drive / Docker
+      interval: 300,      // poll mỗi 300ms (có thể tăng nếu tốn CPU)
+    },
     proxy: {
       "/api": {
-        target: "https://192.168.88.129:3000",
+        target: "https://192.168.169.1:3000",
         changeOrigin: true,
         secure: false,
+        cookieDomainRewrite: "localhost",
       },
       "/logout": {
-        target: "https://192.168.88.129:3000",
+        target: "https://192.168.169.1:3000",
         changeOrigin: true,
         secure: false,
+        cookieDomainRewrite: "localhost",
       },
       "/layouts": {
-        target: "https://192.168.88.129:3000",
+        target: "https://192.168.169.1:3000",
         changeOrigin: true,
         secure: false,
+        cookieDomainRewrite: "localhost",
+      },
+      "/socket.io": {
+        target: "https://192.168.169.1:3000",
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        cookieDomainRewrite: "localhost",
       },
     },
   },

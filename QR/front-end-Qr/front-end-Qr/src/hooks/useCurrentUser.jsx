@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import { UserContext } from '../routes/AppRoutes';
+import api from '../utils/api';
 
 export function useCurrentUser() {
-  // Nếu đang ở trong PrivateLayout (đã có context), dùng luôn
   const ctxUser = useContext(UserContext);
 
   const [currentUser, setCurrentUser] = useState(ctxUser);
@@ -14,15 +14,16 @@ export function useCurrentUser() {
       setLoading(false);
       return;
     }
-    fetch('/api/current-user')
-      .then((r) => r.json())
+    api.get('/api/current-user')
+      .then((r) => r?.json())
       .then((data) => {
+        if (!data) return;
         const user = data.user || data;
         if (!user?.id) { window.location.href = '/login'; return; }
         setCurrentUser(user);
       })
       .catch(() => {
-        setCurrentUser({ id: 1, full_name: 'IT', role: 'admin' });
+        window.location.href = '/login';
       })
       .finally(() => setLoading(false));
   }, [ctxUser]);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import api from '../utils/api';
 
 export function useDropdowns() {
   const [departments, setDepartments] = useState([]);
@@ -7,8 +8,8 @@ export function useDropdowns() {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await fetch('/api/departments');
-        if (res.ok) {
+        const res = await api.get('/api/departments');
+        if (res?.ok) {
           const data = await res.json();
           setDepartments(data);
         }

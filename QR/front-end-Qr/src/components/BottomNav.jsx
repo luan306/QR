@@ -1,7 +1,9 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from "react-i18next";
 
 export default function BottomNav({ currentUser }) {
+  const { t } = useTranslation();
   const location  = useLocation();
   const navigate  = useNavigate();
   const role       = currentUser?.role;
@@ -16,12 +18,12 @@ export default function BottomNav({ currentUser }) {
   }, [location.pathname]); // re-check khi navigate
 
   const tabs = [
-    { path: '/scan',      label: 'Quét QR', icon: 'ri-qr-code-line' },
-    { path: '/inventory', label: 'Kiểm kê', icon: 'ri-file-list-3-line' },
-    ...(hasMap ? [{ path: '/map', label: 'Bản đồ', icon: 'ri-map-2-line' }] : []),
-    { path: '/add',       label: 'Thêm',    icon: 'ri-add-circle-line' },
-    ...(showAudit ? [{ path: '/audit', label: 'Audit', icon: 'ri-survey-line' }] : []),
-  ];
+      { path: '/scan',      label: t("scan"),      icon: 'ri-qr-code-line' },
+      { path: '/inventory', label: t("inventory"), icon: 'ri-file-list-3-line' },
+      ...(hasMap ? [{ path: '/map', label: t("map"), icon: 'ri-map-2-line' }] : []),
+      { path: '/add',       label: t("add"),       icon: 'ri-add-circle-line' },
+      ...(showAudit ? [{ path: '/audit', label: t("audit"), icon: 'ri-survey-line' }] : []),
+    ];
 
   return (
     <nav className="bg-white shadow-inner border-t flex justify-around py-2 fixed bottom-0 left-0 right-0 z-40">

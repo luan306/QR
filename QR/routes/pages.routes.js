@@ -1,14 +1,13 @@
 import express from "express";
 import { checkAuth } from "../middleware/auth.js";
 import { checkAdmin } from "../middleware/admin.js";
-import { getConnection } from "../config/database.js";
+import { query } from "../config/database.js";
 
 const router = express.Router();
 
 // root redirect
 router.get("/", (req, res) => {
   if (!req.session.user) return res.redirect("/login");
-
   res.redirect(req.session.user.role === "admin" ? "/admin" : "/index");
 });
 
@@ -20,9 +19,7 @@ router.get("/index", checkAuth, (req, res) => {
 // admin page
 router.get("/admin", checkAdmin, async (req, res) => {
   try {
-    const conn = await getConnection();
-
-    const [stats] = await conn.execute(`
+    const statsRows = await query(`
       SELECT 
         COUNT(DISTINCT d.id) AS total_devices,
         COUNT(DISTINCT s.id) AS total_scans,
@@ -32,21 +29,17 @@ router.get("/admin", checkAdmin, async (req, res) => {
       LEFT JOIN users u ON u.id = s.user_id
     `);
 
-    const [departments] = await conn.execute(
-      "SELECT * FROM departments"
-    );
+    const departments = await query("SELECT * FROM departments");
 
-    await conn.end();
+    const PORT = process.env.PORT || 3000;
+    const HOST = process.env.HOST || "localhost";
 
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "localhost";
-
-res.render("admin", {
-  user: req.session.user,
-  stats: stats[0],
-  departments,
-  apiUrl: `https://${HOST}:${PORT}/api`
-});
+    res.render("admin", {
+      user: req.session.user,
+      stats: statsRows[0],
+      departments,
+      apiUrl: `https://${HOST}:${PORT}/api`
+    });
   } catch (err) {
     console.error(err);
     res.render("admin", {
